@@ -1,6 +1,6 @@
 from contextlib import suppress
 from tts_tools.libtts import GAMEDATA_DEFAULT
-from tts_tools.libtts import get_fs_path
+from tts_tools.libtts import get_fs_path, get_filename_path
 from tts_tools.libtts import get_save_name
 from tts_tools.libtts import IllegalSavegameException
 from tts_tools.libtts import is_assetbundle
@@ -8,6 +8,7 @@ from tts_tools.libtts import is_audiolibrary
 from tts_tools.libtts import is_image
 from tts_tools.libtts import is_obj
 from tts_tools.libtts import is_pdf
+from tts_tools.libtts import is_from_script
 from tts_tools.libtts import urls_from_save
 from tts_tools.util import print_err
 
@@ -74,6 +75,9 @@ def prefetch_file(
         if url in done:
             continue
 
+        # Only attempt to get a URL one time, even if there is an error
+        done.add(url)
+
         # To prevent downloading unexpected content, we check the MIME
         # type in the response.
         if is_obj(path, url):
@@ -130,6 +134,20 @@ def prefetch_file(
                     "application/binary",
                     "application/octet-stream",
                 )
+        
+        elif is_from_script(path, url):
+            def content_expected(mime):
+                return mime in (
+                    "application/pdf",
+                    "application/binary",
+                    "application/octet-stream",
+                    "application/json",
+                    "application/x-tgif",
+                    "image/jpeg",
+                    "image/jpg",
+                    "image/png",
+                    "video/mp4",
+                )
 
         else:
             errstr = "Do not know how to retrieve URL {url} at {path}.".format(
@@ -137,18 +155,22 @@ def prefetch_file(
             )
             raise ValueError(errstr)
 
-        outfile_name = os.path.join(gamedata_dir, get_fs_path(path, url))
+        # get_fs_path is relative, so need to change to the gamedir directory
+        # so existing file extensions can be properly detected
+        os.chdir(gamedata_dir)
 
-        # Check if the object is already cached.
-        if os.path.isfile(outfile_name) and not refetch:
-            done.add(url)
-            continue
+        outfile_name = get_fs_path(path, url)
+        if outfile_name is not None:
+            outfile_name = os.path.join(gamedata_dir, outfile_name)
+
+            # Check if the object is already cached.
+            if os.path.isfile(outfile_name) and not refetch:
+                continue
 
         print("{} ".format(url), end="", flush=True)
 
         if dry_run:
             print("dry run")
-            done.add(url)
             continue
 
         headers = {"User-Agent": user_agent}
@@ -195,6 +217,35 @@ def prefetch_file(
             )
             sys.exit(1)
 
+        # Format of content disposition looks like this:
+        # 'attachment; filename="03_Die nostrische Hochzeit (Instrumental).mp3"; filename*=UTF-8\'\'03_Die%20nostrische%20Hochzeit%20%28Instrumental%29.mp3'
+        content_disposition = response.getheader("Content-Disposition", "").strip()
+        offset = content_disposition.find('filename="')
+        if offset > 0:
+            name = content_disposition[offset:].split('"')[1]
+            _, filename_ext = os.path.splitext(name)
+
+        if outfile_name is None:
+            outfile_name = get_filename_path(url, filename_ext)
+        else:
+            # Check if we know the extension of our filename.  If not, use
+            # the data in the response to determine the appropriate extension.
+            _, ext = os.path.splitext(outfile_name)
+            if ext == '':
+                if content_type in ['image/png']:
+                    ext = '.png'
+                elif content_type in ['image/jpg', 'image/jpeg']:
+                    ext = '.jpg'
+                else:
+                    ext = filename_ext
+                if ext == '':
+                    print_err(
+                        "Error: Cannot find extension for {name}. Aborting".format(name=outfile_name)
+                    )
+                    sys.exit(1)
+
+                outfile_name = outfile_name + ext
+
         try:
             with open(outfile_name, "wb") as outfile:
                 outfile.write(response.read())
@@ -218,8 +269,6 @@ def prefetch_file(
                 "expected type.".format(content_type)
             )
             print_err(errmsg)
-
-        done.add(url)
 
     if dry_run:
         completion_msg = "Dry-run for {} completed."

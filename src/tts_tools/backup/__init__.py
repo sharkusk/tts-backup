@@ -59,6 +59,7 @@ def backup_json(args):
         for path, url in urls:
 
             filename = get_fs_path(path, url)
+            
             try:
                 outfile.write(filename)
 
@@ -75,7 +76,12 @@ def backup_json(args):
 
         # Finally, include the save file itself.
         orig_json = os.path.join(orig_path, args.infile_name)
-        outfile.write(orig_json, os.path.basename(args.infile_name))
+        outfile.write(orig_json, os.path.join("Mods/Workshop", os.path.basename(args.infile_name)))
+
+        # Check if there is a thumbnail for the mod
+        thumb_filename = os.path.splitext(args.infile_name)[0] + ".png"
+        if os.path.exists(thumb_filename):
+            outfile.write(thumb_filename, os.path.join("Mods/Workshop", os.path.basename(thumb_filename)))
 
         # Store some metadata.
         outfile.put_metadata(comment=args.comment)
