@@ -124,12 +124,6 @@ def seekURL(dic, trail=[]):
 # can do the right thing for each.
 
 
-def is_script_url(path, url):
-    # Check the filename to determine if we can find the filetype
-    # Otherwise we will assume it is an image and correct later
-    # once the file is downloaded...
-    pass
-
 def is_obj(path, url):
     # TODO: None of my mods have NormalURL set (normal maps?). I’m
     # assuming these are image files.
@@ -164,6 +158,10 @@ def is_pdf(path, url):
 
 def is_from_script(path, url):
     return path[-1] == "LuaScript"
+
+
+def is_custom_ui_asset(path, url):
+    return 'CustomUIAssets' in path
 
 
 def recodeURL(url):
@@ -225,7 +223,11 @@ def get_fs_path(path, url):
     if is_from_script(path, url):
         return get_filename_path(url)
 
-    if is_obj(path, url):
+    elif is_custom_ui_asset(path, url):
+        # Custom UI assets can be various types
+        return get_filename_path(url)
+
+    elif is_obj(path, url):
         filename = recoded_name + ".obj"
         return os.path.join(OBJPATH, filename)
 

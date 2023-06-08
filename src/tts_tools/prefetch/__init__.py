@@ -27,7 +27,7 @@ def prefetch_file(
     ignore_content_type=False,
     dry_run=False,
     gamedata_dir=GAMEDATA_DEFAULT,
-    timeout=5,
+    timeout=10,
     semaphore=None,
     user_agent="TTS prefetch",
 ):
@@ -206,7 +206,6 @@ def prefetch_file(
             with suppress(ValueError):
                 length_kb = int(length) / 1000
         size_msg = "({length} kb): ".format(length=length_kb)
-        print(size_msg, end="", flush=True)
 
         content_type = response.getheader("Content-Type", "").strip()
         is_expected = not content_type or content_expected(content_type)
@@ -217,6 +216,9 @@ def prefetch_file(
             )
             sys.exit(1)
 
+        filename_ext = ''
+        ext = ''
+
         # Format of content disposition looks like this:
         # 'attachment; filename="03_Die nostrische Hochzeit (Instrumental).mp3"; filename*=UTF-8\'\'03_Die%20nostrische%20Hochzeit%20%28Instrumental%29.mp3'
         content_disposition = response.getheader("Content-Disposition", "").strip()
@@ -224,9 +226,17 @@ def prefetch_file(
         if offset > 0:
             name = content_disposition[offset:].split('"')[1]
             _, filename_ext = os.path.splitext(name)
+        else:
+            # Use the url to extract the extension, ignoring any trailing ? url parameters
+            offset = url.rfind("?")
+            if offset > 0:
+                _, filename_ext = os.path.splitext(url[0:url.rfind("?")])
+            else:
+                _, filename_ext = os.path.splitext(url)
 
         if outfile_name is None:
-            outfile_name = get_filename_path(url, filename_ext)
+            ext = filename_ext
+            outfile_name = get_filename_path(url, ext)
         else:
             # Check if we know the extension of our filename.  If not, use
             # the data in the response to determine the appropriate extension.
@@ -245,6 +255,8 @@ def prefetch_file(
                     sys.exit(1)
 
                 outfile_name = outfile_name + ext
+
+        print(f"\n ...{outfile_name}: {size_msg}", end="", flush=True)
 
         try:
             with open(outfile_name, "wb") as outfile:
