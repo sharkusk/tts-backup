@@ -1,6 +1,8 @@
 from tts_tools.libtts import get_fs_path
+from tts_tools.libtts import GAMEDATA_DEFAULT
 from tts_tools.libtts import IllegalSavegameException
 from tts_tools.libtts import urls_from_save
+from tts_tools.libtts import get_save_name
 from tts_tools.util import print_err
 from tts_tools.util import ZipFile
 
@@ -11,11 +13,16 @@ import sys
 
 def backup_json(args):
 
+    infile_name = args.infile_name
+
+    if not os.path.exists(infile_name):
+        infile_name = os.path.join(os.path.join(args.gamedata_dir, 'Mods/Workshop'), infile_name)
+
     try:
-        urls = urls_from_save(args.infile_name)
+        urls = urls_from_save(infile_name)
     except (FileNotFoundError, IllegalSavegameException) as error:
         errmsg = "Could not read URLs from '{file}': {error}".format(
-            file=args.infile_name, error=error
+            file=infile_name, error=error
         )
         print_err(errmsg)
         sys.exit(1)
@@ -35,9 +42,12 @@ def backup_json(args):
     if args.outfile_name:
         args.outfile_name = os.path.join(orig_path, args.outfile_name)
     else:
-        outfile_basename = re.sub(
-            r"\.json$", "", os.path.basename(args.infile_name)
-        )
+        try:
+            outfile_basename = get_save_name(infile_name)
+        except Exception:
+            outfile_basename = re.sub(
+                r"\.json$", "", os.path.basename(infile_name)
+            )
         args.outfile_name = os.path.join(orig_path, outfile_basename) + ".zip"
 
     try:
@@ -75,11 +85,11 @@ def backup_json(args):
                 sys.exit(1)
 
         # Finally, include the save file itself.
-        orig_json = os.path.join(orig_path, args.infile_name)
-        outfile.write(orig_json, os.path.join("Mods/Workshop", os.path.basename(args.infile_name)))
+        orig_json = os.path.join(orig_path, infile_name)
+        outfile.write(orig_json, os.path.join("Mods/Workshop", os.path.basename(infile_name)))
 
         # Check if there is a thumbnail for the mod
-        thumb_filename = os.path.splitext(args.infile_name)[0] + ".png"
+        thumb_filename = os.path.splitext(infile_name)[0] + ".png"
         if os.path.exists(thumb_filename):
             outfile.write(thumb_filename, os.path.join("Mods/Workshop", os.path.basename(thumb_filename)))
 
@@ -87,10 +97,10 @@ def backup_json(args):
         outfile.put_metadata(comment=args.comment)
 
     if args.dry_run:
-        print("Dry run for {file} completed.".format(file=args.infile_name))
+        print("Dry run for {file} completed.".format(file=infile_name))
     else:
         print(
             "Backed-up contents for {file} found in {outfile}.".format(
-                file=args.infile_name, outfile=args.outfile_name
+                file=infile_name, outfile=args.outfile_name
             )
         )

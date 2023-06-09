@@ -47,6 +47,9 @@ try:
 except KeyError:
     GAMEDATA_DEFAULT = os.path.expanduser(gamedata_map["Windows"])
 
+if os.path.exists(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')):
+    with open(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')) as f:
+        GAMEDATA_DEFAULT = f.readline()
 
 class IllegalSavegameException(ValueError):
     def __init__(self):

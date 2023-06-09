@@ -31,6 +31,8 @@ def prefetch_file(
     semaphore=None,
     user_agent="TTS prefetch",
 ):
+    if not os.path.exists(filename):
+        filename = os.path.join(os.path.join(gamedata_dir, 'Mods/Workshop'), filename)
 
     try:
         save_name = get_save_name(filename)
@@ -161,8 +163,6 @@ def prefetch_file(
 
         outfile_name = get_fs_path(path, url)
         if outfile_name is not None:
-            outfile_name = os.path.join(gamedata_dir, outfile_name)
-
             # Check if the object is already cached.
             if os.path.isfile(outfile_name) and not refetch:
                 continue
