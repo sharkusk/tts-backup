@@ -57,6 +57,15 @@ parser.add_argument(
     help="A comment to be stored in the resulting Zip.",
 )
 
+parser.add_argument(
+    "--deflate",
+    "-z",
+    dest="deflate",
+    default=False,
+    action="store_true",
+    help="Enable zlib compression in the zip file",
+)
+
 
 def console_entry():
 

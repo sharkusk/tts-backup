@@ -56,6 +56,7 @@ def backup_json(args):
             "w",
             dry_run=args.dry_run,
             ignore_missing=args.ignore_missing,
+            deflate=args.deflate,
         )
     except FileNotFoundError as error:
         errmsg = "Could not write to Zip archive '{outfile}': {error}".format(

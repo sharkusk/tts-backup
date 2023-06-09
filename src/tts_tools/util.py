@@ -36,14 +36,18 @@ class ZipFile(zipfile.ZipFile):
     file to disk.
     """
 
-    def __init__(self, *args, dry_run=False, ignore_missing=False, **kwargs):
+    def __init__(self, *args, dry_run=False, ignore_missing=False, deflate=False, **kwargs):
 
         self.dry_run = dry_run
         self.stored_files = set()
         self.ignore_missing = ignore_missing
 
         if not self.dry_run:
-            super().__init__(*args, compression=zipfile.ZIP_DEFLATED, **kwargs)
+            if deflate:
+                compression = zipfile.ZIP_DEFLATED
+            else:
+                compression = zipfile.ZIP_STORED
+            super().__init__(*args, compression=compression, **kwargs)
 
     def __exit__(self, *args, **kwargs):
 

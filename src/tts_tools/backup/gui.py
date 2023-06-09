@@ -94,6 +94,7 @@ class GUI(Frame):
             ),
             ("comment", TextEntry, dict(label="Archive comment")),
             ("dry_run", ToggleEntry, dict(label="Dry run")),
+            ("deflate", ToggleEntry, dict(label="Enable Compression")),
             ("ignore_missing", ToggleEntry, dict(label="Ignore missing")),
             text="Settings",
             width=60,
@@ -156,6 +157,9 @@ class GUI(Frame):
 
         if self.settings.dry_run.get():
             commands.append("--dry-run")
+
+        if self.settings.deflate.get():
+            commands.append("--deflate")
 
         if self.settings.ignore_missing.get():
             commands.append("--ignore-missing")
