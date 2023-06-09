@@ -265,7 +265,7 @@ def urls_from_save(filename):
 
     with open(filename, "r", encoding="utf-8") as infile:
         try:
-            save = json.load(infile)
+            save = json.load(infile, strict=False)
         except UnicodeDecodeError:
             raise IllegalSavegameException
 
