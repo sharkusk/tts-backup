@@ -11,7 +11,7 @@ PDFPATH = os.path.join("Mods", "PDF")
 TXTPATH = os.path.join("Mods", "Text")
 
 AUDIO_EXTS = ['.MP3', '.WAV', '.OGV', '.OGG']
-IMG_EXTS = ['.png', '.jpg', '.mp4', '.m4v', '.webm', '.mov']
+IMG_EXTS = ['.png', '.jpg', '.mp4', '.m4v', '.webm', '.mov', '.unity3d']
 OBJ_EXTS = ['.obj']
 BUNDLE_EXTS = ['.unity3d']
 PDF_EXTS = ['.PDF']
@@ -139,6 +139,7 @@ def is_image(path, url):
         or is_assetbundle(path, url)
         or is_audiolibrary(path, url)
         or is_pdf(path, url)
+        or is_from_script(path, url)
     )
 
 
