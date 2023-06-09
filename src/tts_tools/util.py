@@ -41,6 +41,7 @@ class ZipFile(zipfile.ZipFile):
         self.dry_run = dry_run
         self.stored_files = set()
         self.ignore_missing = ignore_missing
+        self.missing_files = ''
 
         if not self.dry_run:
             if deflate:
@@ -50,6 +51,13 @@ class ZipFile(zipfile.ZipFile):
             super().__init__(*args, compression=compression, **kwargs)
 
     def __exit__(self, *args, **kwargs):
+
+        if self.missing_files != '':
+            if self.dry_run:
+                print("Missing files:")
+                print(self.missing_files)
+            else:
+                super().writestr("missing.txt", self.missing_files)
 
         if not self.dry_run:
             super().__exit__(*args, **kwargs)
@@ -65,6 +73,7 @@ class ZipFile(zipfile.ZipFile):
 
         def log_skipped():
             print("{} (not found)".format(absname))
+            self.missing_files += f"{filename}\n"
 
         def log_written():
             print(absname)

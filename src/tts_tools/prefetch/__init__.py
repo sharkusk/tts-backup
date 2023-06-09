@@ -40,6 +40,13 @@ def prefetch_file(
     except Exception:
         save_name = "???"
 
+    cur_dir = os.getcwd()
+    missing_filename = os.path.join(cur_dir, save_name) + ".txt"
+
+    # get_fs_path is relative, so need to change to the gamedir directory
+    # so existing file extensions can be properly detected
+    os.chdir(gamedata_dir)
+
     print(
         "Prefetching assets for {file} ({save_name}).".format(
             file=filename, save_name=save_name
@@ -56,6 +63,7 @@ def prefetch_file(
         )
         raise
 
+    missing = []
     done = set()
     for path, url in urls:
 
@@ -147,10 +155,6 @@ def prefetch_file(
             )
             raise ValueError(errstr)
 
-        # get_fs_path is relative, so need to change to the gamedir directory
-        # so existing file extensions can be properly detected
-        os.chdir(gamedata_dir)
-
         outfile_name = get_fs_path(path, url)
         if outfile_name is not None:
             # Check if the object is already cached.
@@ -186,23 +190,28 @@ def prefetch_file(
                     code=error.code, reason=error.reason
                 )
             )
+            missing.append((url, f"HTTPError {error.code} ({error.reason})"))
             continue
 
         except urllib.error.URLError as error:
             print_err("Error ({reason})".format(reason=error.reason))
+            missing.append((url, f"URLError ({error.reason})"))
             continue
 
         except socket.timeout as error:
             print_err("Error ({reason})".format(reason=error))
+            missing.append((url, f"Timeout ({error})"))
             continue
 
         except http.client.HTTPException as error:
             print_err("HTTP error ({reason})".format(reason=error))
+            missing.append((url, f"HTTPException ({error})"))
             continue
     
         if os.path.basename(response.url) == 'removed.png':
             # Imgur sends bogus png when files are missing, ignore them
             print_err("Removed")
+            missing.append((url, f"Removed"))
             continue
 
         # Only for informative purposes.
@@ -220,6 +229,7 @@ def prefetch_file(
             print_err(
                 "Error: Wrong Content type {type}.".format(type=content_type)
             )
+            missing.append((url, f"Wrong context type ({content_type})"))
             continue
 
         filename_ext = ''
@@ -270,6 +280,7 @@ def prefetch_file(
 
         except FileNotFoundError as error:
             print_err("Error writing object to disk: {}".format(error))
+            missing.append((url, f"Error writing to disk ({error})"))
             raise
 
         # Don’t leave files with partial content lying around.
@@ -287,6 +298,14 @@ def prefetch_file(
                 "expected type.".format(content_type)
             )
             print_err(errmsg)
+    
+    if len(missing) > 0:
+        print_err(f"{len(missing)} URLs missing!")
+        print_err(f"Saving missing file list to {missing_filename}.")
+
+        with open(missing_filename, 'w') as f:
+            for url, error in missing:
+                f.write(f"{url}: {error}\n")
 
     if dry_run:
         completion_msg = "Dry-run for {} completed."

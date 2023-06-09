@@ -66,7 +66,6 @@ def backup_json(args):
         sys.exit(1)
 
     with zipfile as outfile:
-
         for path, url in urls:
 
             filename = get_fs_path(path, url)
