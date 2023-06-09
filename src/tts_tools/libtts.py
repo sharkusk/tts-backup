@@ -10,14 +10,15 @@ AUDIOPATH = os.path.join("Mods", "Audio")
 PDFPATH = os.path.join("Mods", "PDF")
 TXTPATH = os.path.join("Mods", "Text")
 
-# If 'upper' is first entry in the list, TTS uses UPPER_CASE extensions
-# for these files.
-AUDIO_EXTS = ['upper', '.mp3', '.wav', '.ogv', '.ogg']
+AUDIO_EXTS = ['.mp3', '.wav', '.ogv', '.ogg']
 IMG_EXTS = ['.png', '.jpg', '.mp4', '.m4v', '.webm', '.mov', '.unity3d']
 OBJ_EXTS = ['.obj']
 BUNDLE_EXTS = ['.unity3d']
-PDF_EXTS = ['upper', '.pdf']
-TXT_EXTS = ['upper', '.txt']
+PDF_EXTS = ['.pdf']
+TXT_EXTS = ['.txt']
+
+# TTS uses UPPER_CASE extensions for these files
+UPPER_EXTS = AUDIO_EXTS + PDF_EXTS + TXT_EXTS
 
 ALL_VALID_EXTS = AUDIO_EXTS + IMG_EXTS + OBJ_EXTS + BUNDLE_EXTS + PDF_EXTS + TXT_EXTS
 
@@ -182,16 +183,12 @@ def get_fs_path_from_json_path(path, url, exts):
     for ext in exts:
         # Search the url for a valid extension
         if url.lower().find(ext.lower()) > 0:
-            if exts[0] == 'upper':
-                ext = ext.upper()
             filename  = recoded_name + ext
             filename = os.path.join(path, filename)
             break
         else:
             # URL didn't give us any hints, so check if this file has already
             # been cached and use the extension from the cached filename
-            if exts[0] == 'upper':
-                ext = ext.upper()
             filename = recoded_name + ext
             filename = os.path.join(path, filename)
             if os.path.exists(filename):
@@ -209,8 +206,6 @@ def search_cached_files(url):
 
     for ttsexts, path in MOD_PATHS:
         for ttsext in ttsexts:
-            if ttsexts[0] == 'upper':
-                ttsext = ttsext.upper()
             filename = recoded_name + ttsext
             filename = os.path.join(path, filename)
             if os.path.exists(filename):
@@ -224,8 +219,6 @@ def get_fs_path_from_extension(url, ext):
 
     for ttsexts, path in MOD_PATHS:
         if ext.lower() in ttsexts:
-            if ttsexts[0] == 'upper':
-                ext = ext.upper()
             filename = recoded_name + ext
             filename = os.path.join(path, filename)
             return filename
@@ -278,6 +271,13 @@ def get_fs_path(path, url):
             "URL {url} at {path}.".format(url=url, path=path)
         )
         raise ValueError(errstr)
+
+
+def fix_ext_case(ext):
+    if ext.lower() in UPPER_EXTS:
+        return ext.upper()
+    else:
+        return ext.lower()
 
 
 def urls_from_save(filename):

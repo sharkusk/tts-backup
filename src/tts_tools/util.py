@@ -130,3 +130,7 @@ def strip_mime_parms(mime_type):
         return mime_type[:idx]
     else:
         return mime_type
+
+
+def make_safe_filename(filename):
+    return "".join([c if c.isalpha() or c.isdigit() or c==' ' else '-' for c in filename]).rstrip() 

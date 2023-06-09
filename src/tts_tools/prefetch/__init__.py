@@ -2,6 +2,7 @@ from contextlib import suppress
 from tts_tools.libtts import GAMEDATA_DEFAULT
 from tts_tools.libtts import get_fs_path
 from tts_tools.libtts import get_fs_path_from_extension
+from tts_tools.libtts import fix_ext_case
 from tts_tools.libtts import get_save_name
 from tts_tools.libtts import IllegalSavegameException
 from tts_tools.libtts import is_assetbundle
@@ -12,6 +13,7 @@ from tts_tools.libtts import is_pdf
 from tts_tools.libtts import is_from_script
 from tts_tools.libtts import urls_from_save
 from tts_tools.util import print_err
+from tts_tools.util import make_safe_filename
 
 import http.client
 import os
@@ -41,7 +43,9 @@ def prefetch_file(
         save_name = "???"
 
     cur_dir = os.getcwd()
-    missing_filename = os.path.join(cur_dir, save_name) + ".txt"
+
+    safe_save_name = make_safe_filename(save_name)
+    missing_filename = os.path.join(cur_dir, safe_save_name) + ".txt"
 
     # get_fs_path is relative, so need to change to the gamedir directory
     # so existing file extensions can be properly detected
@@ -249,6 +253,9 @@ def prefetch_file(
                 _, filename_ext = os.path.splitext(url[0:url.rfind("?")])
             else:
                 _, filename_ext = os.path.splitext(url)
+        
+        # TTS saves some file extensions as upper case
+        filename_ext = fix_ext_case(filename_ext)
 
         if outfile_name is None:
             ext = filename_ext

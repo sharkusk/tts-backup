@@ -5,6 +5,7 @@ from tts_tools.libtts import urls_from_save
 from tts_tools.libtts import get_save_name
 from tts_tools.util import print_err
 from tts_tools.util import ZipFile
+from tts_tools.util import make_safe_filename
 
 import os
 import re
@@ -44,6 +45,8 @@ def backup_json(args):
     else:
         try:
             outfile_basename = get_save_name(infile_name)
+            # Make the filename safe (i.e. remove crazy characters)
+            outfile_basename = make_safe_filename(outfile_basename)
         except Exception:
             outfile_basename = re.sub(
                 r"\.json$", "", os.path.basename(infile_name)
