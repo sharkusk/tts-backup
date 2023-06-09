@@ -43,7 +43,7 @@ class ZipFile(zipfile.ZipFile):
         self.ignore_missing = ignore_missing
 
         if not self.dry_run:
-            super().__init__(*args, **kwargs)
+            super().__init__(*args, compression=zipfile.ZIP_DEFLATED, **kwargs)
 
     def __exit__(self, *args, **kwargs):
 
