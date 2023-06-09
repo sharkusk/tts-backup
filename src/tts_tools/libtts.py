@@ -10,6 +10,8 @@ AUDIOPATH = os.path.join("Mods", "Audio")
 PDFPATH = os.path.join("Mods", "PDF")
 TXTPATH = os.path.join("Mods", "Text")
 
+# If 'upper' is first entry in the list, TTS uses UPPER_CASE extensions
+# for these files.
 AUDIO_EXTS = ['upper', '.mp3', '.wav', '.ogv', '.ogg']
 IMG_EXTS = ['.png', '.jpg', '.mp4', '.m4v', '.webm', '.mov', '.unity3d']
 OBJ_EXTS = ['.obj']
@@ -19,21 +21,17 @@ TXT_EXTS = ['upper', '.txt']
 
 ALL_VALID_EXTS = AUDIO_EXTS + IMG_EXTS + OBJ_EXTS + BUNDLE_EXTS + PDF_EXTS + TXT_EXTS
 
-AUDIO_KEYS = ['AudioLibrary', 'CurrentAudioURL']
-IMG_KEYS = []
-OBJ_KEYS = ['MeshURL', 'ColliderURL']
-BUNDLE_KEYS = ['AssetbundleURL', 'AssetbundleSecondaryURL']
-PDF_KEYS = ['PDFUrl']
-LUA_KEYS = ['LuaScript']
-TXT_KEYS = []
-
-PATHS = [
-    (AUDIO_KEYS, AUDIO_EXTS, AUDIOPATH),
-    (OBJ_KEYS, OBJ_EXTS, OBJPATH),
-    (BUNDLE_KEYS, BUNDLE_EXTS, BUNDLEPATH),
-    (PDF_KEYS, PDF_EXTS, PDFPATH),
-    (IMG_KEYS, IMG_EXTS, IMGPATH),
-    (TXT_KEYS, TXT_EXTS, TXTPATH),
+# Order used to search to appropriate paths based on extension
+# IMG comes last (or at least after BUNDLE) as we prefer to store
+# unity3d files as bundles (but there are cases where unity3d files
+# are used as images -- specifically noticed for decks)
+MOD_PATHS = [
+    (AUDIO_EXTS, AUDIOPATH),
+    (OBJ_EXTS, OBJPATH),
+    (BUNDLE_EXTS, BUNDLEPATH),
+    (PDF_EXTS, PDFPATH),
+    (TXT_EXTS, TXTPATH),
+    (IMG_EXTS, IMGPATH),
 ]
 
 gamedata_map = {
@@ -47,6 +45,8 @@ try:
 except KeyError:
     GAMEDATA_DEFAULT = os.path.expanduser(gamedata_map["Windows"])
 
+# If the mod location is somewhere other than the default location we can
+# provide the path to the new location through a simple one-line test file
 if os.path.exists(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')):
     with open(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')) as f:
         GAMEDATA_DEFAULT = f.readline()
@@ -143,6 +143,7 @@ def is_image(path, url):
         or is_audiolibrary(path, url)
         or is_pdf(path, url)
         or is_from_script(path, url)
+        or is_custom_ui_asset(path, url)
     )
 
 
@@ -174,7 +175,10 @@ def recodeURL(url):
 
     return re.sub(r"[\W_]", "", url)
 
-def identify_filename(path, url, recoded_name, exts):
+
+def get_fs_path_from_json_path(path, url, exts):
+    recoded_name = recodeURL(url)
+
     for ext in exts:
         # Search the url for a valid extension
         if url.lower().find(ext.lower()) > 0:
@@ -200,31 +204,33 @@ def identify_filename(path, url, recoded_name, exts):
     return filename
 
 
-def get_filename_path(url, ext=None):
-    # If ext is set, then lookup the appropriate directory
-    # for that extension.
-    # Otherwise, search in all possible directories, with all possible extensions
-    # to see if a file exists
+def search_cached_files(url):
     recoded_name = recodeURL(url)
 
-    for _, ttsexts, path in PATHS:
-        if ext is None:
-            for ttsext in ttsexts:
-                if ttsexts[0] == 'upper':
-                    ttsext = ttsext.upper()
-                filename = recoded_name + ttsext
-                filename = os.path.join(path, filename)
-                if os.path.exists(filename):
-                    return filename
-        else:
-            if ext.lower() in ttsexts:
-                if ttsexts[0] == 'upper':
-                    ext = ext.upper()
-                filename = recoded_name + ext
-                filename = os.path.join(path, filename)
+    for ttsexts, path in MOD_PATHS:
+        for ttsext in ttsexts:
+            if ttsexts[0] == 'upper':
+                ttsext = ttsext.upper()
+            filename = recoded_name + ttsext
+            filename = os.path.join(path, filename)
+            if os.path.exists(filename):
                 return filename
+    else:
+        return None
 
-    return None
+
+def get_fs_path_from_extension(url, ext):
+    recoded_name = recodeURL(url)
+
+    for ttsexts, path in MOD_PATHS:
+        if ext.lower() in ttsexts:
+            if ttsexts[0] == 'upper':
+                ext = ext.upper()
+            filename = recoded_name + ext
+            filename = os.path.join(path, filename)
+            return filename
+    else:
+        return None
 
 
 def get_fs_path(path, url):
@@ -233,11 +239,16 @@ def get_fs_path(path, url):
     recoded_name = recodeURL(url)
 
     if is_from_script(path, url):
-        return get_filename_path(url)
+        # Can be different extensions and mod directories, so search the cache for
+        # any matches.  If none are found we'll determine the file path during the
+        # download process.
+        return search_cached_files(url)
 
     elif is_custom_ui_asset(path, url):
-        # Custom UI assets can be various types
-        return get_filename_path(url)
+        # Can be different extensions and mod directories, so search the cache for
+        # any matches.  If none are found we'll determine the file path during the
+        # download process.
+        return search_cached_files(url)
 
     elif is_obj(path, url):
         filename = recoded_name + ".obj"
@@ -248,18 +259,18 @@ def get_fs_path(path, url):
         return os.path.join(BUNDLEPATH, filename)
 
     elif is_audiolibrary(path, url):
-        # Is the suffix always MP3, regardless of content?
-        # No, it may be WAV, OGV, etc...
-        return identify_filename(AUDIOPATH, url, recoded_name, AUDIO_EXTS)
+        # We know the cache location of the file
+        # but the extension may be one of many.
+        return get_fs_path_from_json_path(AUDIOPATH, url, AUDIO_EXTS)
 
     elif is_pdf(path, url):
         filename = recoded_name + ".PDF"
         return os.path.join(PDFPATH, filename)
 
     elif is_image(path, url):
-        # TTS appears to perform some weird heuristics when determining
-        # the file suffix. ._.
-        return identify_filename(IMGPATH, url, recoded_name, IMG_EXTS)
+        # We know the cache location of the file
+        # but the extension may be one of many.
+        return get_fs_path_from_json_path(IMGPATH, url, IMG_EXTS)
 
     else:
         errstr = (

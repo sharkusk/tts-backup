@@ -1,6 +1,7 @@
 from contextlib import suppress
 from tts_tools.libtts import GAMEDATA_DEFAULT
-from tts_tools.libtts import get_fs_path, get_filename_path
+from tts_tools.libtts import get_fs_path
+from tts_tools.libtts import get_fs_path_from_extension
 from tts_tools.libtts import get_save_name
 from tts_tools.libtts import IllegalSavegameException
 from tts_tools.libtts import is_assetbundle
@@ -241,7 +242,7 @@ def prefetch_file(
 
         if outfile_name is None:
             ext = filename_ext
-            outfile_name = get_filename_path(url, ext)
+            outfile_name = get_fs_path_from_extension(url, ext)
         else:
             # Check if we know the extension of our filename.  If not, use
             # the data in the response to determine the appropriate extension.
