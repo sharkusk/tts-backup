@@ -10,12 +10,12 @@ AUDIOPATH = os.path.join("Mods", "Audio")
 PDFPATH = os.path.join("Mods", "PDF")
 TXTPATH = os.path.join("Mods", "Text")
 
-AUDIO_EXTS = ['.MP3', '.WAV', '.OGV', '.OGG']
+AUDIO_EXTS = ['upper', '.mp3', '.wav', '.ogv', '.ogg']
 IMG_EXTS = ['.png', '.jpg', '.mp4', '.m4v', '.webm', '.mov', '.unity3d']
 OBJ_EXTS = ['.obj']
 BUNDLE_EXTS = ['.unity3d']
-PDF_EXTS = ['.PDF']
-TXT_EXTS = ['.TXT']
+PDF_EXTS = ['upper', '.pdf']
+TXT_EXTS = ['upper', '.txt']
 
 ALL_VALID_EXTS = AUDIO_EXTS + IMG_EXTS + OBJ_EXTS + BUNDLE_EXTS + PDF_EXTS + TXT_EXTS
 
@@ -178,12 +178,16 @@ def identify_filename(path, url, recoded_name, exts):
     for ext in exts:
         # Search the url for a valid extension
         if url.lower().find(ext.lower()) > 0:
+            if exts[0] == 'upper':
+                ext = ext.upper()
             filename  = recoded_name + ext
             filename = os.path.join(path, filename)
             break
         else:
             # URL didn't give us any hints, so check if this file has already
             # been cached and use the extension from the cached filename
+            if exts[0] == 'upper':
+                ext = ext.upper()
             filename = recoded_name + ext
             filename = os.path.join(path, filename)
             if os.path.exists(filename):
@@ -206,12 +210,16 @@ def get_filename_path(url, ext=None):
     for _, ttsexts, path in PATHS:
         if ext is None:
             for ttsext in ttsexts:
+                if ttsexts[0] == 'upper':
+                    ttsext = ttsext.upper()
                 filename = recoded_name + ttsext
                 filename = os.path.join(path, filename)
                 if os.path.exists(filename):
                     return filename
         else:
-            if ext in ttsexts:
+            if ext.lower() in ttsexts:
+                if ttsexts[0] == 'upper':
+                    ext = ext.upper()
                 filename = recoded_name + ext
                 filename = os.path.join(path, filename)
                 return filename

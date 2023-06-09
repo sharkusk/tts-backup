@@ -62,17 +62,6 @@ def prefetch_file(
             print("Aborted.")
             return
 
-        # Some mods contain malformed URLs missing a prefix. I’m not
-        # sure how TTS deals with these. Let’s assume http for now.
-        if not urllib.parse.urlparse(url).scheme:
-            print_err(
-                "Warning: URL {url} does not specify a URL scheme. "
-                "Assuming http.".format(url=url)
-            )
-            fetch_url = "http://" + url
-        else:
-            fetch_url = url
-
         # A mod might refer to the same URL multiple times.
         if url in done:
             continue
@@ -167,6 +156,17 @@ def prefetch_file(
             if os.path.isfile(outfile_name) and not refetch:
                 continue
 
+        # Some mods contain malformed URLs missing a prefix. I’m not
+        # sure how TTS deals with these. Let’s assume http for now.
+        if not urllib.parse.urlparse(url).scheme:
+            print_err(
+                "Warning: URL {url} does not specify a URL scheme. "
+                "Assuming http.".format(url=url)
+            )
+            fetch_url = "http://" + url
+        else:
+            fetch_url = url
+
         print("{} ".format(url), end="", flush=True)
 
         if dry_run:
@@ -198,6 +198,11 @@ def prefetch_file(
         except http.client.HTTPException as error:
             print_err("HTTP error ({reason})".format(reason=error))
             continue
+    
+        if os.path.basename(response.url) == 'removed.png':
+            # Imgur sends bogus png when files are missing, ignore them
+            print_err("Removed")
+            continue
 
         # Only for informative purposes.
         length = response.getheader("Content-Length", 0)
@@ -210,11 +215,11 @@ def prefetch_file(
         content_type = response.getheader("Content-Type", "").strip()
         is_expected = not content_type or content_expected(content_type)
         if not (is_expected or ignore_content_type):
+            # Google drive sends html error page when file is removed/missing
             print_err(
-                "Error: Content type {type} does not match expected type. "
-                "Aborting. Use --relax to ignore.".format(type=content_type)
+                "Error: Wrong Content type {type}.".format(type=content_type)
             )
-            sys.exit(1)
+            continue
 
         filename_ext = ''
         ext = ''
