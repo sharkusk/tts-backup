@@ -82,6 +82,9 @@ def prefetch_file(
         # Only attempt to get a URL one time, even if there is an error
         done.add(url)
 
+        if urllib.parse.urlparse(url).hostname.find('localhost') >= 0:
+            continue
+
         # To prevent downloading unexpected content, we check the MIME
         # type in the response.
         if is_obj(path, url):
