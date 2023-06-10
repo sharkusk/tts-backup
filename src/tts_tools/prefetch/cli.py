@@ -5,9 +5,47 @@ import argparse
 import signal
 import sys
 
+description = '''
+TTS-Prefetch
+============
+
+TTS-Prefetch downloads assets specified within a TTS JSON save file
+and stores them within the TTS cache. This is handy if you want to
+ensure that all mod assets are present, e. g., when several mods have
+been updated, or when a mod uses bags, which normally require that all
+pieces are unpacked manually before they are fetched and stored inside
+the TTS cache.
+
+Usage
+-----
+
+By default, TTS-Prefetch will assume that cached data is located in
+``~/Documents/My Games/Tabletop Simulator``.  However, if cached data
+is stored elsewhere, a text file with the name 'mod_location.txt' can
+be placed in this directory containing a single line with the location
+of the descired cached data directory
+(e.g. D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data)
+
+When a mod if prefetched, the mod file's modification time is stored in the
+'prefetch_mtimes.pkl' file contained in the same directory as the json file.
+
+Examples
+--------
+
+> tts-prefetch 2495129405.json 2491200259.json
+This will prefetch Mods/Workshop/2495129405.json and Mods/Workshop/2491200259.json
+
+> tts-prefetch -a Workshop
+This will prefetch all json files found in the Mods/Workshop directory
+if their modification time is newer than what is found in the
+Mods/Workshop/prefetch_mtimes.pkl file.
+
+Usage flags and arguments are as follows:
+'''
 
 parser = argparse.ArgumentParser(
-    description="Download assets referenced in TTS .json files."
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=description
 )
 
 parser.add_argument(
@@ -23,7 +61,7 @@ parser.add_argument(
     dest="prefetch_all",
     default=False,
     action="store_true",
-    help="Prefetch all in the directory specified by FILENAME",
+    help="Prefetch all mods in the directory specified by FILENAME.",
 )
 
 parser.add_argument(
