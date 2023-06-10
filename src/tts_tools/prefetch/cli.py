@@ -26,7 +26,7 @@ be placed in this directory containing a single line with the location
 of the directory
 (e.g. D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data)
 
-When a mod if prefetched, the mod file's modification time is stored in the
+When a mod is prefetched, the mod file's modification time is stored in the
 'prefetch_mtimes.pkl' file contained in the same directory as the json file.
 
 If any files are found to be missing during the prefetch operation a text

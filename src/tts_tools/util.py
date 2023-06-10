@@ -3,6 +3,7 @@ import os
 import pkg_resources
 import time
 import zipfile
+import pickle
 
 
 REVISION = pkg_resources.require("tts-backup")[0].version
@@ -134,3 +135,40 @@ def strip_mime_parms(mime_type):
 
 def make_safe_filename(filename):
     return "".join([c if c.isalpha() or c.isdigit() or c in ' ()[]-_{}.' else '-' for c in filename]).rstrip() 
+
+
+def get_mods_in_directory(dir_path, mtime_filename):
+
+    modified_times = {}
+    try:
+        with open(mtime_filename, 'rb') as f:
+            modified_times = pickle.load(f)
+    except FileNotFoundError:
+        pass
+    
+    def get_mtime(name, modified_times):
+        try:
+            return modified_times[name]
+        except:
+            return 0.0
+
+    infile_names = [os.path.join(dir_path, f) for f in os.listdir(dir_path)
+                    if os.path.splitext(f)[1] == '.json' and
+                    os.path.getmtime(os.path.join(dir_path, f)) > get_mtime(f, modified_times) and
+                    os.path.basename(f) != 'WorkshopFileInfos.json']
+
+    return infile_names
+
+
+def save_modification_time(infile_name, mtime_filename):
+    modified_times = {}
+    try:
+        with open(mtime_filename, 'rb') as f:
+            modified_times = pickle.load(f)
+    except FileNotFoundError:
+        pass
+
+    modified_times[os.path.basename(infile_name)] = os.path.getmtime(infile_name)
+
+    with open(mtime_filename, 'wb') as f:
+        pickle.dump(modified_times, f)

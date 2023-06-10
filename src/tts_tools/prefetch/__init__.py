@@ -15,6 +15,8 @@ from tts_tools.libtts import is_custom_ui_asset
 from tts_tools.libtts import urls_from_save
 from tts_tools.util import print_err
 from tts_tools.util import make_safe_filename
+from tts_tools.util import save_modification_time
+from tts_tools.util import get_mods_in_directory
 
 import http.client
 import os
@@ -356,46 +358,26 @@ def prefetch_file(
         completion_msg = "Prefetching {} completed."
     print(completion_msg.format(filename))
 
-import pickle
 
 def prefetch_files(args, semaphore=None):
 
     if args.prefetch_all:
-
-        # TODO: Move directory scanning to utils so it can be reused by backup script
-
+        infile_names = []
         for infile_dir in args.infile_names:
             if not os.path.exists(infile_dir):
-                infile_dir = os.path.join(GAMEDATA_DEFAULT, os.path.join('Mods', infile_dir))
+                infile_dir = os.path.join(args.gamedata_dir, os.path.join('Mods', infile_dir))
             if not os.path.exists(infile_dir):
                 print_err(f"Cannot find directory {infile_dir}")
                 continue
-
-            modified_times = {}
-            try:
-                with open(os.path.join(infile_dir, 'prefetch_mtimes.pkl'), 'rb') as f:
-                    modified_times = pickle.load(f)
-            except FileNotFoundError:
-                pass
             
-            def get_mtime(name, modified_times):
-                try:
-                    return modified_times[name]
-                except:
-                    return 0.0
-
-            infile_names = [os.path.join(infile_dir, f) for f in os.listdir(infile_dir)
-                            if os.path.splitext(f)[1] == '.json' and
-                            os.path.getmtime(os.path.join(infile_dir, f)) > get_mtime(f, modified_times) and
-                            os.path.basename(f) != 'WorkshopFileInfos.json']
-
+            infile_names += get_mods_in_directory(infile_dir, os.path.join(infile_dir, 'prefetch_mtimes.pkl'))
     else:
         infile_names = args.infile_names
 
     for infile_name in infile_names:
 
         if not os.path.exists(infile_name):
-            infile_name = os.path.join(os.path.join(GAMEDATA_DEFAULT, 'Mods/Workshop'), infile_name)
+            infile_name = os.path.join(os.path.join(args.gamedata_dir, 'Mods/Workshop'), infile_name)
 
         try:
             prefetch_file(
@@ -413,14 +395,4 @@ def prefetch_files(args, semaphore=None):
             print_err("Aborting.")
             sys.exit(1)
 
-        modified_times = {}
-        try:
-            with open(os.path.join(os.path.dirname(infile_name), 'prefetch_mtimes.pkl'), 'rb') as f:
-                modified_times = pickle.load(f)
-        except FileNotFoundError:
-            pass
-
-        modified_times[os.path.basename(infile_name)] = os.path.getmtime(infile_name)
-
-        with open(os.path.join(os.path.dirname(infile_name), 'prefetch_mtimes.pkl'), 'wb') as f:
-            pickle.dump(modified_times, f)
+        save_modification_time(infile_name, os.path.join(os.path.dirname(infile_name), 'prefetch_mtimes.pkl'))
