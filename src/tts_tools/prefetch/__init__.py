@@ -313,6 +313,13 @@ def prefetch_file(
         # Don’t leave files with partial content lying around.
         except Exception:
             with suppress(FileNotFoundError):
+                print(f"..cleanup.. ", end='', flush=True)
+                os.remove(outfile_name)
+            raise
+
+        except SystemExit:
+            with suppress(FileNotFoundError):
+                print(f"..cleanup.. ", end='', flush=True)
                 os.remove(outfile_name)
             raise
 
