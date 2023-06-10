@@ -113,6 +113,14 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--timeout_retries",
+    dest="timeout_retries",
+    default=10,
+    type=int,
+    help="Number of times to retry when a timeout occurs",
+)
+
+parser.add_argument(
     "--user-agent",
     "-u",
     dest="user_agent",

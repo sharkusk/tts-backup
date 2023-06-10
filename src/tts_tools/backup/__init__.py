@@ -165,4 +165,5 @@ def backup_files(args):
             print_err("Aborting.")
             sys.exit(1)
         
-        save_modification_time(infile_name, os.path.join(out_dir, 'backup_mtimes.pkl'))
+        if not args.dry_run:
+            save_modification_time(infile_name, os.path.join(out_dir, 'backup_mtimes.pkl'))

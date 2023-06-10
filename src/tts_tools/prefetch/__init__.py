@@ -27,6 +27,152 @@ import urllib.parse
 import urllib.request
 
 
+def download_file(
+    url,
+    fetch_url,
+    outfile_name,
+    headers,
+    timeout,
+    content_expected,
+    ignore_content_type,
+):
+    missing = None
+    request = urllib.request.Request(url=fetch_url, headers=headers)
+
+    try:
+        response = urllib.request.urlopen(request, timeout=timeout)
+
+    except urllib.error.HTTPError as error:
+        print_err(
+            "Error {code} ({reason})".format(
+                code=error.code, reason=error.reason
+            )
+        )
+        missing = (url, f"HTTPError {error.code} ({error.reason})")
+
+    except urllib.error.URLError as error:
+        print_err("Error ({reason})".format(reason=error.reason))
+        missing = (url, f"URLError ({error.reason})")
+
+    except http.client.HTTPException as error:
+        print_err("HTTP error ({reason})".format(reason=error))
+        missing = (url, f"HTTPException ({error})")
+
+    try:
+        if os.path.basename(response.url) == 'removed.png':
+            # Imgur sends bogus png when files are missing, ignore them
+            print_err("Removed")
+            missing = (url, f"Removed")
+    except UnboundLocalError:
+        pass
+
+    if missing is not None:
+        return missing
+
+    # Only for informative purposes.
+    length = response.getheader("Content-Length", 0)
+    length_kb = "???"
+    if length:
+        with suppress(ValueError):
+            length_kb = int(length) / 1000
+    size_msg = "({length} kb): ".format(length=length_kb)
+
+    # Some content_type arrives as: 'text/plain; charset=utf-8', we only care about
+    # the first part...
+    content_type = response.getheader("Content-Type", "").split(';')[0].strip()
+    is_expected = not content_type or content_expected(content_type)
+    if not (is_expected or ignore_content_type):
+        # Google drive sends html error page when file is removed/missing
+        print_err(
+            "Error: Wrong Content type {type}.".format(type=content_type)
+        )
+        return (url, f"Wrong context type ({content_type})")
+
+    filename_ext = ''
+    ext = ''
+
+    # Format of content disposition looks like this:
+    # 'attachment; filename="03_Die nostrische Hochzeit (Instrumental).mp3"; filename*=UTF-8\'\'03_Die%20nostrische%20Hochzeit%20%28Instrumental%29.mp3'
+    content_disposition = response.getheader("Content-Disposition", "").strip()
+    offset = content_disposition.find('filename="')
+    if offset > 0:
+        name = content_disposition[offset:].split('"')[1]
+        _, filename_ext = os.path.splitext(name)
+    else:
+        # Use the url to extract the extension, ignoring any trailing ? url parameters
+        offset = url.rfind("?")
+        if offset > 0:
+            _, filename_ext = os.path.splitext(url[0:url.rfind("?")])
+        else:
+            _, filename_ext = os.path.splitext(url)
+    
+    # TTS saves some file extensions as upper case
+    filename_ext = fix_ext_case(filename_ext)
+
+    if outfile_name is None:
+        ext = filename_ext
+        outfile_name = get_fs_path_from_extension(url, ext)
+
+        if outfile_name is None:
+            print_err(
+                "Unknown file type {type}.".format(type=ext)
+            )
+            return (url, f"Unknown file type ({ext})")
+    else:
+        # Check if we know the extension of our filename.  If not, use
+        # the data in the response to determine the appropriate extension.
+        _, ext = os.path.splitext(outfile_name)
+        if ext == '':
+            if content_type in ['image/png']:
+                ext = '.png'
+            elif content_type in ['image/jpg', 'image/jpeg']:
+                ext = '.jpg'
+            else:
+                ext = filename_ext
+            if ext == '':
+                print_err(
+                    "Error: Cannot find extension for {name}. Aborting".format(name=outfile_name)
+                )
+                sys.exit(1)
+
+            outfile_name = outfile_name + ext
+    
+    mod_dir = os.path.split(os.path.split(outfile_name)[0])[1]
+    print(f"{ext} -> {mod_dir}: {size_msg}", end="", flush=True)
+
+    try:
+        with open(outfile_name, "wb") as outfile:
+            outfile.write(response.read())
+
+    except FileNotFoundError as error:
+        print_err("Error writing object to disk: {}".format(error))
+        raise
+
+    # Don’t leave files with partial content lying around.
+    except Exception:
+        with suppress(FileNotFoundError):
+            print(f"..cleanup.. ", end='', flush=True)
+            os.remove(outfile_name)
+        raise
+
+    except SystemExit:
+        with suppress(FileNotFoundError):
+            print(f"..cleanup.. ", end='', flush=True)
+            os.remove(outfile_name)
+        raise
+
+    else:
+        print("ok")
+
+    if not is_expected:
+        errmsg = (
+            "Warning: Content type {} did not match "
+            "expected type.".format(content_type)
+        )
+        print_err(errmsg)
+
+    return None
+
 def prefetch_file(
     filename,
     refetch=False,
@@ -34,6 +180,7 @@ def prefetch_file(
     dry_run=False,
     gamedata_dir=GAMEDATA_DEFAULT,
     timeout=10,
+    timeout_retries=10,
     semaphore=None,
     user_agent="TTS prefetch",
 ):
@@ -187,156 +334,30 @@ def prefetch_file(
 
         headers = {"User-Agent": user_agent}
 
-        request_error = False
-
-        while(True):
-            request = urllib.request.Request(url=fetch_url, headers=headers)
-
+        for _ in range(timeout_retries):
             try:
-                response = urllib.request.urlopen(request, timeout=timeout)
-
+                results = download_file(
+                    url,
+                    fetch_url,
+                    outfile_name,
+                    headers,
+                    timeout,
+                    content_expected,
+                    ignore_content_type
+                )
             except socket.timeout as error:
-                print_err("Error ({reason})".format(reason=error))
+                print_err("Error ({reason}). Retrying...".format(reason=error))
                 continue
-
-            except urllib.error.HTTPError as error:
-                print_err(
-                    "Error {code} ({reason})".format(
-                        code=error.code, reason=error.reason
-                    )
-                )
-                missing.append((url, f"HTTPError {error.code} ({error.reason})"))
-                request_error = True
-
-            except urllib.error.URLError as error:
-                print_err("Error ({reason})".format(reason=error.reason))
-                missing.append((url, f"URLError ({error.reason})"))
-                request_error = True
-
-            except http.client.HTTPException as error:
-                print_err("HTTP error ({reason})".format(reason=error))
-                missing.append((url, f"HTTPException ({error})"))
-                request_error = True
-        
-            try:
-                if os.path.basename(response.url) == 'removed.png':
-                    # Imgur sends bogus png when files are missing, ignore them
-                    print_err("Removed")
-                    missing.append((url, f"Removed"))
-                    request_error = True
-            except UnboundLocalError:
-                pass
-
-            # We only continue to retry due to timeouts, otherwise break out of while loop
+            except http.client.IncompleteRead as error:
+                print_err("Error ({reason}). Retrying...".format(reason=error))
+                continue
             break
-
-        if request_error:
-            continue
-
-        # Only for informative purposes.
-        length = response.getheader("Content-Length", 0)
-        length_kb = "???"
-        if length:
-            with suppress(ValueError):
-                length_kb = int(length) / 1000
-        size_msg = "({length} kb): ".format(length=length_kb)
-
-        # Some content_type arrives as: 'text/plain; charset=utf-8', we only care about
-        # the first part...
-        content_type = response.getheader("Content-Type", "").split(';')[0].strip()
-        is_expected = not content_type or content_expected(content_type)
-        if not (is_expected or ignore_content_type):
-            # Google drive sends html error page when file is removed/missing
-            print_err(
-                "Error: Wrong Content type {type}.".format(type=content_type)
-            )
-            missing.append((url, f"Wrong context type ({content_type})"))
-            continue
-
-        filename_ext = ''
-        ext = ''
-
-        # Format of content disposition looks like this:
-        # 'attachment; filename="03_Die nostrische Hochzeit (Instrumental).mp3"; filename*=UTF-8\'\'03_Die%20nostrische%20Hochzeit%20%28Instrumental%29.mp3'
-        content_disposition = response.getheader("Content-Disposition", "").strip()
-        offset = content_disposition.find('filename="')
-        if offset > 0:
-            name = content_disposition[offset:].split('"')[1]
-            _, filename_ext = os.path.splitext(name)
         else:
-            # Use the url to extract the extension, ignoring any trailing ? url parameters
-            offset = url.rfind("?")
-            if offset > 0:
-                _, filename_ext = os.path.splitext(url[0:url.rfind("?")])
-            else:
-                _, filename_ext = os.path.splitext(url)
-        
-        # TTS saves some file extensions as upper case
-        filename_ext = fix_ext_case(filename_ext)
+            print_err("All timeout retries exhausted.")
+            sys.exit(1)
 
-        if outfile_name is None:
-            ext = filename_ext
-            outfile_name = get_fs_path_from_extension(url, ext)
-
-            if outfile_name is None:
-                print_err(
-                    "Unknown file type {type}.".format(type=ext)
-                )
-                missing.append((url, f"Unknown file type ({ext})"))
-                continue
-        else:
-            # Check if we know the extension of our filename.  If not, use
-            # the data in the response to determine the appropriate extension.
-            _, ext = os.path.splitext(outfile_name)
-            if ext == '':
-                if content_type in ['image/png']:
-                    ext = '.png'
-                elif content_type in ['image/jpg', 'image/jpeg']:
-                    ext = '.jpg'
-                else:
-                    ext = filename_ext
-                if ext == '':
-                    print_err(
-                        "Error: Cannot find extension for {name}. Aborting".format(name=outfile_name)
-                    )
-                    sys.exit(1)
-
-                outfile_name = outfile_name + ext
-        
-        mod_dir = os.path.split(os.path.split(outfile_name)[0])[1]
-        print(f"{ext} -> {mod_dir}: {size_msg}", end="", flush=True)
-
-        try:
-            with open(outfile_name, "wb") as outfile:
-                outfile.write(response.read())
-
-        except FileNotFoundError as error:
-            print_err("Error writing object to disk: {}".format(error))
-            missing.append((url, f"Error writing to disk ({error})"))
-            raise
-
-        # Don’t leave files with partial content lying around.
-        except Exception:
-            with suppress(FileNotFoundError):
-                print(f"..cleanup.. ", end='', flush=True)
-                os.remove(outfile_name)
-            raise
-
-        except SystemExit:
-            with suppress(FileNotFoundError):
-                print(f"..cleanup.. ", end='', flush=True)
-                os.remove(outfile_name)
-            raise
-
-        else:
-            print("ok")
-
-        if not is_expected:
-            errmsg = (
-                "Warning: Content type {} did not match "
-                "expected type.".format(content_type)
-            )
-            print_err(errmsg)
+        if results is not None:
+            missing.append(results)
     
     if len(missing) > 0:
         workshop_id = os.path.splitext(os.path.basename(filename))[0]
@@ -387,6 +408,7 @@ def prefetch_files(args, semaphore=None):
                 ignore_content_type=args.ignore_content_type,
                 gamedata_dir=args.gamedata_dir,
                 timeout=args.timeout,
+                timeout_retries=args.timeout_retries,
                 semaphore=semaphore,
                 user_agent=args.user_agent,
             )
@@ -395,4 +417,5 @@ def prefetch_files(args, semaphore=None):
             print_err("Aborting.")
             sys.exit(1)
 
-        save_modification_time(infile_name, os.path.join(os.path.dirname(infile_name), 'prefetch_mtimes.pkl'))
+        if not args.dry_run:
+            save_modification_time(infile_name, os.path.join(os.path.dirname(infile_name), 'prefetch_mtimes.pkl'))
