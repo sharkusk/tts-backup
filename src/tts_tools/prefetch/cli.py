@@ -29,6 +29,10 @@ of the directory
 When a mod if prefetched, the mod file's modification time is stored in the
 'prefetch_mtimes.pkl' file contained in the same directory as the json file.
 
+If any files are found to be missing during the prefetch operation a text
+file containing a list of the missing files will be created in the directory
+containing the mod's json file.
+
 Examples
 --------
 
