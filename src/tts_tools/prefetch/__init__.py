@@ -153,6 +153,7 @@ def prefetch_file(
 
             def content_expected(mime):
                 return mime in (
+                    "text/plain",
                     "application/pdf",
                     "application/binary",
                     "application/octet-stream",
@@ -238,7 +239,9 @@ def prefetch_file(
                 length_kb = int(length) / 1000
         size_msg = "({length} kb): ".format(length=length_kb)
 
-        content_type = response.getheader("Content-Type", "").strip()
+        # Some content_type arrives as: 'text/plain; charset=utf-8', we only care about
+        # the first part...
+        content_type = response.getheader("Content-Type", "").split(';')[0].strip()
         is_expected = not content_type or content_expected(content_type)
         if not (is_expected or ignore_content_type):
             # Google drive sends html error page when file is removed/missing
