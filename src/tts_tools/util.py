@@ -133,4 +133,4 @@ def strip_mime_parms(mime_type):
 
 
 def make_safe_filename(filename):
-    return "".join([c if c.isalpha() or c.isdigit() or c==' ' else '-' for c in filename]).rstrip() 
+    return "".join([c if c.isalpha() or c.isdigit() or c in ' ()[]-_{}.' else '-' for c in filename]).rstrip() 
