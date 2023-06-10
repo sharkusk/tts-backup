@@ -10,11 +10,11 @@ TTS-Prefetch
 ============
 
 TTS-Prefetch downloads assets specified within a TTS JSON save file
-and stores them within the TTS cache. This is handy if you want to
-ensure that all mod assets are present, e. g., when several mods have
-been updated, or when a mod uses bags, which normally require that all
-pieces are unpacked manually before they are fetched and stored inside
-the TTS cache.
+(including links found in LuaScript sections) and stores them within
+the TTS cache. This is handy if you want to ensure that all mod assets
+are present, e. g., when several mods have been updated, or when a mod
+uses bags, which normally require that all pieces are unpacked manually
+before they are fetched and stored inside the TTS cache.
 
 Usage
 -----
@@ -23,7 +23,7 @@ By default, TTS-Prefetch will assume that cached data is located in
 ``~/Documents/My Games/Tabletop Simulator``.  However, if cached data
 is stored elsewhere, a text file with the name 'mod_location.txt' can
 be placed in this directory containing a single line with the location
-of the descired cached data directory
+of the directory
 (e.g. D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data)
 
 When a mod if prefetched, the mod file's modification time is stored in the
