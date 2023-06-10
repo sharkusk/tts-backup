@@ -296,7 +296,6 @@ def urls_from_save(filename):
 
 def get_save_name(filename):
 
-    workshop_id = os.path.splitext(os.path.basename(filename))[0]
     with open(filename, "r", encoding="utf-8") as infile:
         save = json.load(infile)
-    return save["SaveName"] + f" ({workshop_id})"
+    return save["SaveName"]

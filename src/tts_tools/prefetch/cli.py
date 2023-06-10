@@ -18,6 +18,15 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--prefetch_all",
+    "-a",
+    dest="prefetch_all",
+    default=False,
+    action="store_true",
+    help="Prefetch all in the directory specified by FILENAME",
+)
+
+parser.add_argument(
     "--gamedata",
     dest="gamedata_dir",
     metavar="PATH",
@@ -60,9 +69,10 @@ parser.add_argument(
     type=int,
     help="Connection timeout in s.",
 )
+
 parser.add_argument(
     "--user-agent",
-    "-a",
+    "-u",
     dest="user_agent",
     default="tts-backup",
     help="HTTP user-agent string.",
