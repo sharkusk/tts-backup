@@ -35,7 +35,7 @@ once they are removed from the bag.
 
 By default, TTS-Backup will assume that cached data is located in
 ``~/Documents/My Games/Tabletop Simulator``.  However, if cached data
-is stored elsewhere, a text file with the name 'mod_location.txt' can
+is stored elsewhere, a text file with the name ``mod_location.txt`` can
 be placed in this directory containing a single line with the location
 of the directory
 (e.g. ``D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data``)
@@ -53,9 +53,11 @@ Examples
 --------
 
 ``> tts-backup 2495129405.json``
+
 This will backup Mods/Workshop/2495129405.json
 
 ``> tts-backup -a Workshop``
+
 This will backup all json files found in the Mods/Workshop directory
 if their modification time is newer than what is found in the
 Mods/Workshop/backup_mtimes.pkl file.
