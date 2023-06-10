@@ -85,13 +85,13 @@ Usage
 
 By default, TTS-Prefetch will assume that cached data is located in
 ``~/Documents/My Games/Tabletop Simulator``.  However, if cached data
-is stored elsewhere, a text file with the name 'mod_location.txt' can
+is stored elsewhere, a text file with the name ``mod_location.txt`` can
 be placed in this directory containing a single line with the location
 of the directory
-(e.g. D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data)
+(e.g. ``D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data``)
 
 When a mod if prefetched, the mod file's modification time is stored in the
-'prefetch_mtimes.pkl' file contained in the same directory as the json file.
+``prefetch_mtimes.pkl`` file contained in the same directory as the json file.
 
 
 Examples
@@ -99,13 +99,13 @@ Examples
 
 ``> tts-prefetch 2495129405.json 2491200259.json``
 
-This will prefetch Mods/Workshop/2495129405.json and Mods/Workshop/2491200259.json
+This will prefetch  ``Mods/Workshop/2495129405.json`` and ``Mods/Workshop/2491200259.json``
 
 ``> tts-prefetch -a Workshop``
 
 This will prefetch all json files found in the Mods/Workshop directory
 if their modification time is newer than what is found in the
-Mods/Workshop/prefetch_mtimes.pkl file.
+``Mods/Workshop/prefetch_mtimes.pkl`` file.
 
 Usage flags and arguments are as follows:
 
