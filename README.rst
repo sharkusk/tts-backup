@@ -87,7 +87,7 @@ By default, TTS-Prefetch will assume that cached data is located in
 ``~/Documents/My Games/Tabletop Simulator``.  However, if cached data
 is stored elsewhere, a text file with the name 'mod_location.txt' can
 be placed in this directory containing a single line with the location
-of the descired cached data directory
+of the directory
 (e.g. D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data)
 
 When a mod if prefetched, the mod file's modification time is stored in the
@@ -97,27 +97,31 @@ When a mod if prefetched, the mod file's modification time is stored in the
 Examples
 --------
 
-> tts-prefetch 2495129405.json 2491200259.json
+``> tts-prefetch 2495129405.json 2491200259.json``
+
 This will prefetch Mods/Workshop/2495129405.json and Mods/Workshop/2491200259.json
 
-> tts-prefetch -a Workshop
+``> tts-prefetch -a Workshop``
+
 This will prefetch all json files found in the Mods/Workshop directory
 if their modification time is newer than what is found in the
 Mods/Workshop/prefetch_mtimes.pkl file.
 
 Usage flags and arguments are as follows:
 
-positional arguments:
-  FILENAME              The save file or mod in JSON format.
+::
 
-options:
-  -h, --help            show this help message and exit
-  --prefetch_all, -a    Prefetch all in the directory specified by FILENAME.
-  --gamedata PATH       The path to the TTS game data directory.
-  --dry-run, -n         Only print which files would be downloaded.
-  --refetch, -r         Rewrite objects that already exist in the cache.
-  --relax, -x           Do not abort when encountering an unexpected MIME type.
-  --timeout TIMEOUT, -t TIMEOUT
-                        Connection timeout in s.
-  --user-agent USER_AGENT, -u USER_AGENT
-                        HTTP user-agent string.
+  positional arguments:
+    FILENAME              The save file or mod in JSON format.
+
+  options:
+    -h, --help            show this help message and exit
+    --prefetch_all, -a    Prefetch all in the directory specified by FILENAME.
+    --gamedata PATH       The path to the TTS game data directory.
+    --dry-run, -n         Only print which files would be downloaded.
+    --refetch, -r         Rewrite objects that already exist in the cache.
+    --relax, -x           Do not abort when encountering an unexpected MIME type.
+    --timeout TIMEOUT, -t TIMEOUT
+                          Connection timeout in s.
+    --user-agent USER_AGENT, -u USER_AGENT
+                          HTTP user-agent string.
