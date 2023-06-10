@@ -28,39 +28,56 @@ the contents and run ``python setup.py install``.
 Usage
 -----
 
-All content referenced within the mod or save must have been locally
-cached from within TTS before a backup can be made. Note that when
-game items are contained within bags, TTS will only locally cache the
-respective assets once they are removed from the bag.
+All content referenced within the mod or save must have been locally cached
+from within TTS before a backup can be made. Note that when game items are
+contained within bags, TTS will only locally cache the respective assets
+once they are removed from the bag.
 
 By default, TTS-Backup will assume that cached data is located in
-``~/Documents/My Games/Tabletop Simulator``.
+``~/Documents/My Games/Tabletop Simulator``.  However, if cached data
+is stored elsewhere, a text file with the name 'mod_location.txt' can
+be placed in this directory containing a single line with the location
+of the directory
+(e.g. ``D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data``)
 
-TTS-Backup is a console application. For stern opponents of the CLI, a
-minimal GUI is provided.
+When a backup is completed, the mod file's modification time is stored in the
+``backup_mtimes.pkl`` file contained in the backup directory (or current directory
+if no backup directory was specified).
+
+If any files are found to be missing during the backup operation a text
+file containing a list of the missing files will be created in the root
+of the zip file.
+
+
+Examples
+--------
+
+``> tts-backup 2495129405.json``
+This will backup Mods/Workshop/2495129405.json
+
+``> tts-backup -a Workshop``
+This will backup all json files found in the Mods/Workshop directory
+if their modification time is newer than what is found in the
+Mods/Workshop/backup_mtimes.pkl file.
 
 Usage flags and arguments are as follows:
 
 ::
 
-    usage: tts-backup [-h] [--gamedata PATH] [--outname FILENAME] [--dry-run]
-                      [--ignore-missing] [--comment COMMENT]
-                      FILENAME
+  positional arguments:
+    FILENAME              The save file or mod in JSON format.
 
-    Back-up locally cached content from a TTS .json file.
-
-    positional arguments:
-      FILENAME              The save file or mod in JSON format.
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      --gamedata PATH       The path to the TTS game data directory.
-      --outname FILENAME, -o FILENAME
-                            The name for the output archive.
-      --dry-run, -n         Only print which files would be backed up.
-      --ignore-missing, -i  Don’t abort the backup when files are missing.
-      --comment COMMENT, -c COMMENT
-                            A comment to be stored in the resulting Zip.
+  options:
+    -h, --help            show this help message and exit
+    --backup_all, -a      Backup all mods in the directory specified by FILENAME.
+    --gamedata PATH       The path to the TTS game data dircetory.
+    --outname FILENAME, -o FILENAME
+                          The name (or directory for multiple backups) for the output archive.
+    --dry-run, -n         Only print which files would be backed up.
+    --ignore-missing, -i  Do not abort the backup when files are missing.
+    --comment COMMENT, -c COMMENT
+                          A comment to be stored in the resulting Zip.
+    --deflate, -z         Enable zlib compression in the zip file
 
 
 TTS-Prefetch
