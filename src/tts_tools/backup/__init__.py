@@ -91,6 +91,9 @@ def backup_json(
 
             filename = get_fs_path(path, url)
 
+            if filename is None:
+                filename = recodeURL(url)
+
             try:
                 if outfile.write(filename) is not None:
                     num_missing += 1

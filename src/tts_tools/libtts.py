@@ -236,8 +236,6 @@ def get_fs_path(path, url):
         # any matches.  If none are found we'll determine the file path during the
         # download process.
         filename = search_cached_files(url)
-        if filename is None:
-            filename = f"{os.path.join('FROM_SCRIPT', recoded_name)}"
         return filename
 
     elif is_custom_ui_asset(path, url):
@@ -245,8 +243,6 @@ def get_fs_path(path, url):
         # any matches.  If none are found we'll determine the file path during the
         # download process.
         filename = search_cached_files(url)
-        if filename is None:
-            filename = f"{os.path.join(IMGPATH, recoded_name)}"
         return filename
 
     elif is_obj(path, url):
