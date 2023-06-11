@@ -66,7 +66,9 @@ class ZipFile(zipfile.ZipFile):
     def write(self, filename, *args, **kwargs):
 
         if filename in self.stored_files:
-            return
+            return None
+
+        self.stored_files.add(filename)
 
         # Logging.
         curdir = os.getcwd()
@@ -96,8 +98,11 @@ class ZipFile(zipfile.ZipFile):
                 log_skipped()
             else:
                 log_written()
+                filename = None
 
-        self.stored_files.add(filename)
+        # If filename is not none then there was a problem writing it, so notify
+        # the caller than this file was not stored...
+        return filename
 
     def put_metadata(self, comment=None):
         """Create a MANIFEST file and store it within the archive."""

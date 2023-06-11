@@ -235,13 +235,19 @@ def get_fs_path(path, url):
         # Can be different extensions and mod directories, so search the cache for
         # any matches.  If none are found we'll determine the file path during the
         # download process.
-        return search_cached_files(url)
+        filename = search_cached_files(url)
+        if filename is None:
+            filename = f"{os.path.join('FROM_SCRIPT', recoded_name)}"
+        return filename
 
     elif is_custom_ui_asset(path, url):
         # Can be different extensions and mod directories, so search the cache for
         # any matches.  If none are found we'll determine the file path during the
         # download process.
-        return search_cached_files(url)
+        filename = search_cached_files(url)
+        if filename is None:
+            filename = f"{os.path.join(IMGPATH, recoded_name)}"
+        return filename
 
     elif is_obj(path, url):
         filename = recoded_name + ".obj"
