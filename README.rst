@@ -15,14 +15,28 @@ A Python 3.5 (or newer) interpreter is required. For Windows users, the
 `ActivePython <http://www.activestate.com/activepython/downloads>`__
 distribution is recommended.
 
+.. |ss| raw:: html
+
+   <strike>
+
+.. |se| raw:: html
+
+   </strike>
+
+|ss|
 Alternatively, a binary release for the Windows platform is available
 `here
 <https://github.com/eigengrau/tts-backup/releases/tag/win32-frozen>`__.
+|se|
 
 Optionally, to use the source distribution, download the current
 `release <https://github.com/eigengrau/tts-backup/releases>`__, and
 either use ``pip`` or ``easy_install`` on the archive file, or extract
 the contents and run ``python setup.py install``.
+
+If you wish to install the code in place (i.e. any updates to the repository
+will automaticaly be used) you can install using ``pip install -e .`` from
+the directory containing the tts-backup code.
 
 
 Usage
@@ -31,22 +45,47 @@ Usage
 All content referenced within the mod or save must have been locally cached
 from within TTS before a backup can be made. Note that when game items are
 contained within bags, TTS will only locally cache the respective assets
-once they are removed from the bag.
+once they are removed from the bag. To avoid this problem, use the
+``tts-prefetch`` tool to cache assets before running a backup operation.
+
+
+Tabletop Simulator Data Directory
+---------------------------------
 
 By default, TTS-Backup will assume that cached data is located in
-``~/Documents/My Games/Tabletop Simulator``.  However, if cached data
-is stored elsewhere, a text file with the name ``mod_location.txt`` can
-be placed in this directory containing a single line with the location
-of the directory
-(e.g. ``D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data``)
+``~/Documents/My Games/Tabletop Simulator``.  This can be overridden 
+using the ``--gamedata`` parameter.  To override the default directory
+without having to use the gamedata parameter on every run, a text file with
+the name ``mod_location.txt`` can be placed in the default directory
+containing a single line with the location of the ``Tabletop Simulator_Data``
+directory.
+
+Example ``mod_location.txt`` file (stored in ``~/Documents/My Games/Tabletop Simulator``):
+::
+  D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data
+
+
+Tracking Mod's Modified Time
+-----------------------------
 
 When a backup is completed, the mod file's modification time is stored in the
 ``backup_mtimes.pkl`` file contained in the backup directory (or current directory
-if no backup directory was specified).
+if no backup directory was specified).  This is ignored if an individual
+mod file is selected for backup at the command line.  However, when backing up using
+the ``--backup-all`` feature, only mods that are newer than their last backup will
+be processed.
+
+
+Missing File Features
+---------------------
 
 If any files are found to be missing during the backup operation a text
 file containing a list of the missing files will be created in the root
 of the zip file.
+
+The number of missing files will also be appended to the end of the backup
+file name (as a negative number in parens).
+e.g. ``Clank- Legacy- Acquisitions Incorporated [2100953124] (-80).zip``
 
 
 Examples
@@ -99,22 +138,27 @@ Requirements & Installation
 Cf. above.
 
 
-Usage
------
+Tabletop Simulator Data Directory
+---------------------------------
 
-By default, TTS-Prefetch will assume that cached data is located in
-``~/Documents/My Games/Tabletop Simulator``.  However, if cached data
-is stored elsewhere, a text file with the name ``mod_location.txt`` can
-be placed in this directory containing a single line with the location
-of the directory
-(e.g. ``D:\SteamLibrary\steamapps\common\Tabletop Simulator\Tabletop Simulator_Data``)
+Cf. above.
 
-When a mod if prefetched, the mod file's modification time is stored in the
-``prefetch_mtimes.pkl`` file contained in the same directory as the json file.
+
+Tracking Mod's Modified Time
+-----------------------------
+
+When a backup is completed, the mod file's modification time is stored in the
+``prefetch_mtimes.pkl`` file in the same directory as the mod.json file.  This 
+is ignored if individual mod files are selected for prefetch at the command line.
+However, when prefetching using the ``--prefetch-all`` feature, only mods that
+are newer than their last prefetch will be processed.
+
+Missing File Features
+---------------------
 
 If any files are found to be missing during the prefetch operation a text
 file containing a list of the missing files will be created in the directory
-containing the mod's json file.
+containing the mod.json file.
 
 
 Examples
@@ -148,3 +192,10 @@ Usage flags and arguments are as follows:
                           Connection timeout in s.
     --user-agent USER_AGENT, -u USER_AGENT
                           HTTP user-agent string.
+                         
+
+Suggested Workflow
+==================
+1. Perform prefetch of all subscribed mods:  ``> tts-prefetch -a Workshop``
+2. Create a backup directory, and cd to that directory.  Perform backup of all subscribed mods from that directory: ``> tts-backup -a Workshop``
+3. After running TTS, when notification that one or more mods have been updated, repeat steps 1 and 2.  The Prefetch and backup operations will only be performed on the updated mods.
