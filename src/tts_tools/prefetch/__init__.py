@@ -43,7 +43,7 @@ def download_file(
         response = urllib.request.urlopen(request, timeout=timeout)
 
     except urllib.error.HTTPError as error:
-        print_err(
+        print(
             "Error {code} ({reason})".format(
                 code=error.code, reason=error.reason
             )
@@ -51,17 +51,17 @@ def download_file(
         missing = (url, f"HTTPError {error.code} ({error.reason})")
 
     except urllib.error.URLError as error:
-        print_err("Error ({reason})".format(reason=error.reason))
+        print("Error ({reason})".format(reason=error.reason))
         missing = (url, f"URLError ({error.reason})")
 
     except http.client.HTTPException as error:
-        print_err("HTTP error ({reason})".format(reason=error))
+        print("HTTP error ({reason})".format(reason=error))
         missing = (url, f"HTTPException ({error})")
 
     try:
         if os.path.basename(response.url) == 'removed.png':
             # Imgur sends bogus png when files are missing, ignore them
-            print_err("Removed")
+            print("Removed")
             missing = (url, f"Removed")
     except UnboundLocalError:
         pass
@@ -83,9 +83,7 @@ def download_file(
     is_expected = not content_type or content_expected(content_type)
     if not (is_expected or ignore_content_type):
         # Google drive sends html error page when file is removed/missing
-        print_err(
-            "Error: Wrong Content type {type}.".format(type=content_type)
-        )
+        print("Error: Wrong Content type {type}.".format(type=content_type))
         return (url, f"Wrong context type ({content_type})")
 
     filename_ext = ''
@@ -114,9 +112,7 @@ def download_file(
         outfile_name = get_fs_path_from_extension(url, ext)
 
         if outfile_name is None:
-            print_err(
-                "Unknown file type {type}.".format(type=ext)
-            )
+            print("Unknown file type {type}.".format(type=ext))
             return (url, f"Unknown file type ({ext})")
     else:
         # Check if we know the extension of our filename.  If not, use
@@ -130,9 +126,7 @@ def download_file(
             else:
                 ext = filename_ext
             if ext == '':
-                print_err(
-                    "Error: Cannot find extension for {name}. Aborting".format(name=outfile_name)
-                )
+                print_err("Error: Cannot find extension for {name}. Aborting".format(name=outfile_name))
                 sys.exit(1)
 
             outfile_name = outfile_name + ext
