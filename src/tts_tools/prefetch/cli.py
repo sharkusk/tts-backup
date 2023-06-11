@@ -4,6 +4,7 @@ from tts_tools.prefetch import prefetch_files
 import argparse
 import signal
 import sys
+from importlib.metadata import version
 
 description = '''
 TTS-Prefetch
@@ -50,6 +51,12 @@ Usage flags and arguments are as follows:
 parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     description=description
+)
+
+parser.add_argument(
+    "--version",
+    action='version',
+    version=version("tts-backup")
 )
 
 parser.add_argument(

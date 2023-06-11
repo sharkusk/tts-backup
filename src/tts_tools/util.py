@@ -1,12 +1,11 @@
 import json
 import os
-import pkg_resources
 import time
 import zipfile
 import pickle
+from importlib.metadata import version
 
-
-REVISION = pkg_resources.require("tts-backup")[0].version
+REVISION = version("tts-backup")
 
 
 class ShadowProxy:

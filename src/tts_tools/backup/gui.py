@@ -25,6 +25,7 @@ import os
 import os.path
 import re
 import threading
+from importlib.metadata import version
 
 
 class GUI(Frame):
@@ -51,6 +52,8 @@ class GUI(Frame):
         self.make_widgets()
 
     def make_widgets(self):
+
+        self.winfo_toplevel().title(f"TTS-Backup ({version('tts-backup')})")
 
         self.label = Label(
             self, text="TTS-Backup", font=Font(size=14, weight="bold")

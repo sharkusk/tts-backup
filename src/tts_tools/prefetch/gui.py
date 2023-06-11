@@ -24,6 +24,7 @@ import argparse
 import os
 import os.path
 import threading
+from importlib.metadata import version
 
 
 class GUI(Frame):
@@ -60,6 +61,8 @@ class GUI(Frame):
             super().quit()
 
     def make_widgets(self):
+
+        self.winfo_toplevel().title(f"TTS-Prefetch ({version('tts-backup')})")
 
         self.label = Label(
             self, text="TTS-Prefetch", font=Font(size=14, weight="bold")
