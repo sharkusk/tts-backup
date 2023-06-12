@@ -219,15 +219,20 @@ def prefetch_file(
         )
         raise
 
-    missing = []
+    # Pre-filter duplicate URLs to make progress bar more accurate
     done = set()
-
-    urls = list(urls)
+    unique_urls = []
+    for path, url in urls:
+        if url in done:
+            continue
+        done.add(url)
+        unique_urls.append((path, url))
+    
+    missing = []
     skipped = False
-
-    with alive_bar(len(urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
+    with alive_bar(len(unique_urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
         ps = PrintStatus(bar)
-        for path, url in urls:
+        for path, url in unique_urls:
 
             if semaphore and semaphore.acquire(blocking=False):
                 ps.print("Aborted.")
@@ -237,14 +242,6 @@ def prefetch_file(
                 bar(skipped=skipped)
                 skipped = False
             
-            # A mod might refer to the same URL multiple times.
-            if url in done:
-                skipped = True
-                continue
-
-            # Only attempt to get a URL one time, even if there is an error
-            done.add(url)
-
             # Some mods contain malformed URLs missing a prefix. I’m not
             # sure how TTS deals with these. Let’s assume http for now.
             if not urllib.parse.urlparse(url).scheme:
@@ -398,7 +395,7 @@ def prefetch_file(
         missing_filename = f"{workshop_id} [{safe_save_name}] missing.txt"
         missing_path = os.path.join(dest, missing_filename)
 
-        ps.print(f"{len(missing)} URLs missing!")
+        print(f"...{len(missing)} URLs missing!")
         ps.print(f"Saving missing file list to {missing_path}.")
 
         with open(missing_path, 'w') as f:
