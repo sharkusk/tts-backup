@@ -57,11 +57,14 @@ class IllegalSavegameException(ValueError):
         super().__init__("not a Tabletop Simulator savegame")
 
 
-def seekURL(dic, trail=[]):
+def seekURL(dic, trail=[], done=None):
     """Recursively search through the save game structure and return URLs
     and the paths to them.
 
     """
+
+    if done is None:
+        done = set()
 
     for k, v in dic.items():
 
@@ -72,20 +75,24 @@ def seekURL(dic, trail=[]):
                 try:
                     # It appears that AudioLibrary items are mappings of form
                     # “Item1” → URL, “Item2” → audio title.
-                    yield (newtrail, elem["Item1"])
+                    url = elem["Item1"]
+                    if url in done:
+                        continue
+                    done.add(url)
+                    yield (newtrail, url)
                 except KeyError:
                     raise NotImplementedError(
                         "AudioLibrary has unexpected structure: {}".format(v)
                     )
 
         elif isinstance(v, dict):
-            yield from seekURL(v, newtrail)
+            yield from seekURL(v, newtrail, done)
 
         elif isinstance(v, list):
             for elem in v:
                 if not isinstance(elem, dict):
                     continue
-                yield from seekURL(elem, newtrail)
+                yield from seekURL(elem, newtrail, done)
 
         elif k.lower().endswith("url"):
             # We don’t want tablet URLs.
@@ -99,7 +106,9 @@ def seekURL(dic, trail=[]):
             # Deck art URLs can contain metadata in curly braces
             # (yikes).
             v = re.sub(r"{.*}", "", v)
-
+            if v in done:
+                continue
+            done.add(v)
             yield (newtrail, v)
 
         elif k == "LuaScript":
@@ -121,6 +130,9 @@ def seekURL(dic, trail=[]):
                             break
 
                 if valid_url:
+                    if url in done:
+                        continue
+                    done.add(url)
                     yield (newtrail, url)
 
 

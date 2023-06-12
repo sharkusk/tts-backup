@@ -219,20 +219,13 @@ def prefetch_file(
         )
         raise
 
-    # Pre-filter duplicate URLs to make progress bar more accurate
-    done = set()
-    unique_urls = []
-    for path, url in urls:
-        if url in done:
-            continue
-        done.add(url)
-        unique_urls.append((path, url))
-    
     missing = []
     skipped = False
-    with alive_bar(len(unique_urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
+    urls = list(urls) # Need for progress bar count
+
+    with alive_bar(len(urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
         ps = PrintStatus(bar)
-        for path, url in unique_urls:
+        for path, url in urls:
 
             if semaphore and semaphore.acquire(blocking=False):
                 ps.print("Aborted.")
@@ -351,15 +344,19 @@ def prefetch_file(
                     skipped = True
                     continue
 
-            ps.print("{} ".format(url), end="", flush=True)
-
             if dry_run:
+                ps.print("{} ".format(url), end="", flush=True)
                 ps.print("dry run")
                 continue
 
             headers = {"User-Agent": user_agent}
 
-            for _ in range(timeout_retries):
+            for i in range(timeout_retries):
+                if i == 0:
+                    retry_message = ""
+                else:
+                    retry_message = f"Retry {i}: "
+                ps.print("{}{} ".format(retry_message,url), end="", flush=True)
                 try:
                     results = download_file(
                         url,
@@ -396,7 +393,7 @@ def prefetch_file(
         missing_path = os.path.join(dest, missing_filename)
 
         print(f"...{len(missing)} URLs missing!")
-        ps.print(f"Saving missing file list to {missing_path}.")
+        print(f"Saving missing file list to {missing_path}.")
 
         with open(missing_path, 'w') as f:
             for url, error in missing:
@@ -406,7 +403,7 @@ def prefetch_file(
         completion_msg = "Dry-run for {} completed."
     else:
         completion_msg = "Prefetching {} completed."
-    ps.print(completion_msg.format(filename))
+    print(completion_msg.format(filename))
 
 
 def prefetch_files(args, semaphore=None):
