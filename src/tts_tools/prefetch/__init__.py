@@ -41,7 +41,9 @@ def download_file(
     timeout,
     content_expected,
     ignore_content_type,
-    ps
+    default_ext,
+    ps,
+    verbose
 ):
     missing = None
     request = urllib.request.Request(url=fetch_url, headers=headers)
@@ -82,7 +84,7 @@ def download_file(
     if length:
         with suppress(ValueError):
             length_kb = int(length) / 1000
-    size_msg = "({length} kb): ".format(length=length_kb)
+    size_msg = "({length} kb)".format(length=length_kb)
 
     # Some content_type arrives as: 'text/plain; charset=utf-8', we only care about
     # the first part...
@@ -133,13 +135,17 @@ def download_file(
             else:
                 ext = filename_ext
             if ext == '':
-                print_err("Error: Cannot find extension for {name}. Aborting".format(name=outfile_name))
-                sys.exit(1)
+                ext = default_ext
+                print_err("Warning: Cannot find extension for {name}.  Using default {ext}".format(name=outfile_name, ext=ext))
 
             outfile_name = outfile_name + ext
     
     mod_dir = os.path.split(os.path.split(outfile_name)[0])[1]
-    ps.print(f"{ext} -> {mod_dir}: {size_msg}", end="", flush=True)
+    if verbose:
+        ps.print(f"{ext} -> {mod_dir} {size_msg}: ", end="", flush=True)
+    else:
+        # We want to print progress bar status immediately...
+        ps.print(f"{ext} -> {mod_dir} {size_msg}")
 
     try:
         with open(outfile_name, "wb") as outfile:
@@ -163,7 +169,8 @@ def download_file(
         raise
 
     else:
-        ps.print("ok")
+        if verbose:
+            ps.print("ok")
 
     if not is_expected:
         errmsg = (
@@ -216,6 +223,7 @@ def prefetch_file(
     done = set()
 
     urls = list(urls)
+    skipped = False
 
     with alive_bar(len(urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
         ps = PrintStatus(bar)
@@ -224,12 +232,14 @@ def prefetch_file(
             if semaphore and semaphore.acquire(blocking=False):
                 ps.print("Aborted.")
                 return
-            
-            if not verbose:
-                bar()
 
+            if not verbose:
+                bar(skipped=skipped)
+                skipped = False
+            
             # A mod might refer to the same URL multiple times.
             if url in done:
+                skipped = True
                 continue
 
             # Only attempt to get a URL one time, even if there is an error
@@ -244,16 +254,19 @@ def prefetch_file(
 
             try:
                 if urllib.parse.urlparse(fetch_url).hostname.find('localhost') >= 0:
+                    skipped = True
                     continue
             except:
                 # URL was so badly formatted that there is no hostname.
                 missing.append((url, f"Invalid hostname"))
+                skipped = True
                 continue
 
             # To prevent downloading unexpected content, we check the MIME
             # type in the response.
             if is_obj(path, url):
 
+                default_ext = '.obj'
                 def content_expected(mime):
                     return any(
                         map(
@@ -270,6 +283,7 @@ def prefetch_file(
 
             elif is_assetbundle(path, url):
 
+                default_ext = '.unity3d'
                 def content_expected(mime):
                     return any(
                         map(
@@ -280,6 +294,7 @@ def prefetch_file(
 
             elif is_image(path, url):
 
+                default_ext = '.png'
                 def content_expected(mime):
                     return mime in (
                         "image/jpeg",
@@ -292,6 +307,7 @@ def prefetch_file(
 
             elif is_audiolibrary(path, url):
 
+                default_ext = '.WAV'
                 def content_expected(mime):
                     return mime in (
                         "application/octet-stream",
@@ -300,6 +316,7 @@ def prefetch_file(
 
             elif is_pdf(path, url):
 
+                default_ext = '.PDF'
                 def content_expected(mime):
                     return mime in (
                         "application/pdf",
@@ -309,6 +326,7 @@ def prefetch_file(
             
             elif is_from_script(path, url) or is_custom_ui_asset(path, url):
 
+                default_ext = '.png'
                 def content_expected(mime):
                     return mime in (
                         "text/plain",
@@ -333,6 +351,7 @@ def prefetch_file(
             if outfile_name is not None:
                 # Check if the object is already cached.
                 if os.path.isfile(outfile_name) and not refetch:
+                    skipped = True
                     continue
 
             ps.print("{} ".format(url), end="", flush=True)
@@ -353,7 +372,9 @@ def prefetch_file(
                         timeout,
                         content_expected,
                         ignore_content_type,
-                        ps
+                        default_ext,
+                        ps,
+                        verbose
                     )
                 except socket.timeout as error:
                     ps.print("Error ({reason}). Retrying...".format(reason=error))
@@ -367,6 +388,7 @@ def prefetch_file(
                 sys.exit(1)
 
             if results is not None:
+                skipped = True
                 missing.append(results)
     
     if len(missing) > 0:
