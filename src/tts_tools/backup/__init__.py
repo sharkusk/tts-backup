@@ -9,12 +9,15 @@ from tts_tools.util import ZipFile
 from tts_tools.util import make_safe_filename
 from tts_tools.util import save_modification_time
 from tts_tools.util import get_mods_in_directory
+from tts_tools.util import PrintStatus
 
 import os
 import re
 import sys
 import glob
 
+from alive_progress import alive_bar; import time, logging
+from contextlib import nullcontext
 
 def backup_json(
     infile_name,
@@ -24,18 +27,18 @@ def backup_json(
     dry_run=False,
     gamedata_dir=GAMEDATA_DEFAULT,
     ignore_missing=False,
-    deflate=False
+    deflate=False,
+    verbose=False,
 ):
     try:
         save_name = get_save_name(infile_name)
     except Exception:
         save_name = "???"
 
-    print(
-        "\nBacking up assets for {file} [{save_name}].".format(
-            file=infile_name, save_name=save_name
-        )
-    )
+    readable_filename = f"{os.path.basename(infile_name)} [{save_name}]"
+
+    if verbose:
+        print(readable_filename)
 
     try:
         urls = urls_from_save(infile_name)
@@ -70,55 +73,62 @@ def backup_json(
             )
         outfile_name = f"{os.path.join(out_dir, outfile_basename)} [{os.path.splitext(os.path.basename(infile_name))[0]}].zip"
 
-    try:
-        zipfile = ZipFile(
-            outfile_name,
-            "w",
-            dry_run=dry_run,
-            ignore_missing=ignore_missing,
-            deflate=deflate,
-        )
-    except FileNotFoundError as error:
-        errmsg = "Could not write to Zip archive '{outfile}': {error}".format(
-            outfile=outfile_name, error=error
-        )
-        print_err(errmsg)
-        sys.exit(1)
+    urls = list(urls)
+    with alive_bar(len(urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
+        ps = PrintStatus(bar)
+        try:
+            zipfile = ZipFile(
+                outfile_name,
+                "w",
+                dry_run=dry_run,
+                ignore_missing=ignore_missing,
+                deflate=deflate,
+                ps=ps,
+            )
+        except FileNotFoundError as error:
+            errmsg = "Could not write to Zip archive '{outfile}': {error}".format(
+                outfile=outfile_name, error=error
+            )
+            print_err(errmsg)
+            sys.exit(1)
 
-    num_missing = 0
-    with zipfile as outfile:
-        for path, url in urls:
+        num_missing = 0
+        with zipfile as outfile:
+            for path, url in urls:
 
-            filename = get_fs_path(path, url)
+                if not verbose:
+                    bar()
 
-            if filename is None:
-                filename = recodeURL(url)
+                filename = get_fs_path(path, url)
 
-            try:
-                if outfile.write(filename) is not None:
-                    num_missing += 1
+                if filename is None:
+                    filename = recodeURL(url)
 
-            except FileNotFoundError as error:
-                errmsg = "Could not write {filename} to Zip ({error}).".format(
-                    filename=filename, error=error
-                )
-                print_err(errmsg, "Aborting.", sep="\n", end=" ")
-                if not dry_run:
-                    print_err("Zip file is incomplete.")
-                else:
-                    print_err()
-                sys.exit(1)
+                try:
+                    if outfile.write(filename) is not None:
+                        num_missing += 1
 
-        # Finally, include the save file itself.
-        outfile.write(infile_name, os.path.join("Mods/Workshop", os.path.basename(infile_name)))
+                except FileNotFoundError as error:
+                    errmsg = "Could not write {filename} to Zip ({error}).".format(
+                        filename=filename, error=error
+                    )
+                    print_err(errmsg, "Aborting.", sep="\n", end=" ")
+                    if not dry_run:
+                        print_err("Zip file is incomplete.")
+                    else:
+                        print_err()
+                    sys.exit(1)
 
-        # Check if there is a thumbnail for the mod
-        thumb_filename = os.path.splitext(infile_name)[0] + ".png"
-        if os.path.exists(thumb_filename):
-            outfile.write(thumb_filename, os.path.join("Mods/Workshop", os.path.basename(thumb_filename)))
+            # Finally, include the save file itself.
+            outfile.write(infile_name, os.path.join("Mods/Workshop", os.path.basename(infile_name)))
 
-        # Store some metadata.
-        outfile.put_metadata(comment=comment)
+            # Check if there is a thumbnail for the mod
+            thumb_filename = os.path.splitext(infile_name)[0] + ".png"
+            if os.path.exists(thumb_filename):
+                outfile.write(thumb_filename, os.path.join("Mods/Workshop", os.path.basename(thumb_filename)))
+
+            # Store some metadata.
+            outfile.put_metadata(comment=comment)
     
     if dry_run:
         print("Dry run for {file} completed.".format(file=infile_name))
@@ -139,11 +149,12 @@ def backup_json(
             os.rename(outfile_name, new_name)
             outfile_name = new_name
 
-        print(
-            "Backed-up contents for {file} in {outfile}.".format(
-                file=infile_name, outfile=outfile_name
+        if verbose:
+            print(
+                "Backed-up contents for {file} in {outfile}.".format(
+                    file=infile_name, outfile=outfile_name
+                )
             )
-        )
 
 def backup_files(args):
 
@@ -192,7 +203,8 @@ def backup_files(args):
                 dry_run=args.dry_run,
                 gamedata_dir=args.gamedata_dir,
                 ignore_missing=args.ignore_missing,
-                deflate=args.deflate
+                deflate=args.deflate,
+                verbose=args.verbose
             )
 
         except (FileNotFoundError, IllegalSavegameException, SystemExit):

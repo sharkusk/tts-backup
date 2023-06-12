@@ -135,6 +135,15 @@ parser.add_argument(
     help="HTTP user-agent string.",
 )
 
+parser.add_argument(
+    "--verbose",
+    "-v",
+    dest="verbose",
+    default=False,
+    action="store_true",
+    help="Verbose print output, disables progress bar.",
+)
+
 
 def sigint_handler(signum, frame):
     sys.exit(1)

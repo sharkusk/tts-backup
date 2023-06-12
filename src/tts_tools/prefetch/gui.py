@@ -127,6 +127,8 @@ class GUI(Frame):
         if not args:
             return
 
+        args.verbose = True  # Disable progress bar
+
         self.output.clear()
 
         self.semaphore = threading.Semaphore(0)

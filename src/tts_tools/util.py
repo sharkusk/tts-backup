@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import time
@@ -36,12 +37,17 @@ class ZipFile(zipfile.ZipFile):
     file to disk.
     """
 
-    def __init__(self, *args, dry_run=False, ignore_missing=False, deflate=False, **kwargs):
+    def __init__(self, *args, dry_run=False, ignore_missing=False, deflate=False, ps=None, **kwargs):
 
         self.dry_run = dry_run
         self.stored_files = set()
         self.ignore_missing = ignore_missing
         self.missing_files = ''
+
+        if ps is None:
+            self.ps = PrintStatus()
+        else:
+            self.ps = ps
 
         if not self.dry_run:
             if deflate:
@@ -74,11 +80,11 @@ class ZipFile(zipfile.ZipFile):
         absname = os.path.join(curdir, filename)
 
         def log_skipped():
-            print("{} (not found)".format(absname))
+            self.ps.print("{} (not found)".format(absname))
             self.missing_files += f"{filename}\n"
 
         def log_written():
-            print(absname)
+            self.ps.print(absname)
 
         if not (os.path.isfile(filename) or self.ignore_missing):
             raise FileNotFoundError("No such file: {}".format(filename))
@@ -176,3 +182,28 @@ def save_modification_time(infile_name, mtime_filename):
 
     with open(mtime_filename, 'wb') as f:
         pickle.dump(modified_times, f)
+
+
+class PrintStatus():
+
+    def __init__(self, bar=None):
+        self.buffered_text = ""
+        self.bar = bar
+
+    def print(self, *args, **kwargs):
+        if self.bar:
+            if 'end' in kwargs.keys() and kwargs['end'] == "":
+                output = io.StringIO()
+                print(*args, file=output, **kwargs)
+                self.buffered_text += output.getvalue()
+                output.close()
+            else:
+                output = io.StringIO()
+                print(*args, file=output, **kwargs)
+                contents = output.getvalue()
+                output.close()
+
+                self.bar.text(self.buffered_text + contents)
+                self.buffered_text = ""
+        else:
+            print(*args, **kwargs)

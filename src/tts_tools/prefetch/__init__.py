@@ -17,6 +17,7 @@ from tts_tools.util import print_err
 from tts_tools.util import make_safe_filename
 from tts_tools.util import save_modification_time
 from tts_tools.util import get_mods_in_directory
+from tts_tools.util import PrintStatus
 
 import http.client
 import os
@@ -26,6 +27,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from alive_progress import alive_bar; import time, logging
+from contextlib import nullcontext
+
+#logging.basicConfig(level=logging.INFO)
+#logger = logging.getLogger('alive_progress')
 
 def download_file(
     url,
@@ -35,6 +41,7 @@ def download_file(
     timeout,
     content_expected,
     ignore_content_type,
+    ps
 ):
     missing = None
     request = urllib.request.Request(url=fetch_url, headers=headers)
@@ -43,7 +50,7 @@ def download_file(
         response = urllib.request.urlopen(request, timeout=timeout)
 
     except urllib.error.HTTPError as error:
-        print(
+        ps.print(
             "Error {code} ({reason})".format(
                 code=error.code, reason=error.reason
             )
@@ -51,17 +58,17 @@ def download_file(
         missing = (url, f"HTTPError {error.code} ({error.reason})")
 
     except urllib.error.URLError as error:
-        print("Error ({reason})".format(reason=error.reason))
+        ps.print("Error ({reason})".format(reason=error.reason))
         missing = (url, f"URLError ({error.reason})")
 
     except http.client.HTTPException as error:
-        print("HTTP error ({reason})".format(reason=error))
+        ps.print("HTTP error ({reason})".format(reason=error))
         missing = (url, f"HTTPException ({error})")
 
     try:
         if os.path.basename(response.url) == 'removed.png':
             # Imgur sends bogus png when files are missing, ignore them
-            print("Removed")
+            ps.print("Removed")
             missing = (url, f"Removed")
     except UnboundLocalError:
         pass
@@ -83,7 +90,7 @@ def download_file(
     is_expected = not content_type or content_expected(content_type)
     if not (is_expected or ignore_content_type):
         # Google drive sends html error page when file is removed/missing
-        print("Error: Wrong Content type {type}.".format(type=content_type))
+        ps.print("Error: Wrong Content type {type}.".format(type=content_type))
         return (url, f"Wrong context type ({content_type})")
 
     filename_ext = ''
@@ -112,7 +119,7 @@ def download_file(
         outfile_name = get_fs_path_from_extension(url, ext)
 
         if outfile_name is None:
-            print("Unknown file type {type}.".format(type=ext))
+            ps.print("Unknown file type {type}.".format(type=ext))
             return (url, f"Unknown file type ({ext})")
     else:
         # Check if we know the extension of our filename.  If not, use
@@ -132,7 +139,7 @@ def download_file(
             outfile_name = outfile_name + ext
     
     mod_dir = os.path.split(os.path.split(outfile_name)[0])[1]
-    print(f"{ext} -> {mod_dir}: {size_msg}", end="", flush=True)
+    ps.print(f"{ext} -> {mod_dir}: {size_msg}", end="", flush=True)
 
     try:
         with open(outfile_name, "wb") as outfile:
@@ -145,18 +152,18 @@ def download_file(
     # Don’t leave files with partial content lying around.
     except Exception:
         with suppress(FileNotFoundError):
-            print(f"..cleanup.. ", end='', flush=True)
+            ps.print(f"..cleanup.. ", end='', flush=True)
             os.remove(outfile_name)
         raise
 
     except SystemExit:
         with suppress(FileNotFoundError):
-            print(f"..cleanup.. ", end='', flush=True)
+            ps.print(f"..cleanup.. ", end='', flush=True)
             os.remove(outfile_name)
         raise
 
     else:
-        print("ok")
+        ps.print("ok")
 
     if not is_expected:
         errmsg = (
@@ -177,23 +184,23 @@ def prefetch_file(
     timeout_retries=10,
     semaphore=None,
     user_agent="TTS prefetch",
+    verbose=False,
 ):
     try:
         save_name = get_save_name(filename)
     except Exception:
         save_name = "???"
-
+    
     cur_dir = os.getcwd()
 
     # get_fs_path is relative, so need to change to the gamedir directory
     # so existing file extensions can be properly detected
     os.chdir(gamedata_dir)
 
-    print(
-        "\nPrefetching assets for {file} [{save_name}].".format(
-            file=filename, save_name=save_name
-        )
-    )
+    readable_filename = f"{os.path.basename(filename)} [{save_name}]"
+
+    if verbose:
+        print(readable_filename)
 
     try:
         urls = urls_from_save(filename)
@@ -207,151 +214,160 @@ def prefetch_file(
 
     missing = []
     done = set()
-    for path, url in urls:
 
-        if semaphore and semaphore.acquire(blocking=False):
-            print("Aborted.")
-            return
+    urls = list(urls)
 
-        # A mod might refer to the same URL multiple times.
-        if url in done:
-            continue
+    with alive_bar(len(urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
+        ps = PrintStatus(bar)
+        for path, url in urls:
 
-        # Only attempt to get a URL one time, even if there is an error
-        done.add(url)
+            if semaphore and semaphore.acquire(blocking=False):
+                ps.print("Aborted.")
+                return
+            
+            if not verbose:
+                bar()
 
-        # Some mods contain malformed URLs missing a prefix. I’m not
-        # sure how TTS deals with these. Let’s assume http for now.
-        if not urllib.parse.urlparse(url).scheme:
-            fetch_url = "http://" + url
-        else:
-            fetch_url = url
-
-        try:
-            if urllib.parse.urlparse(fetch_url).hostname.find('localhost') >= 0:
-                continue
-        except:
-            # URL was so badly formatted that there is no hostname.
-            missing.append((url, f"Invalid hostname"))
-            continue
-
-        # To prevent downloading unexpected content, we check the MIME
-        # type in the response.
-        if is_obj(path, url):
-
-            def content_expected(mime):
-                return any(
-                    map(
-                        mime.startswith,
-                        (
-                            "text/plain",
-                            "application/binary",
-                            "application/octet-stream",
-                            "application/json",
-                            "application/x-tgif",
-                        ),
-                    )
-                )
-
-        elif is_assetbundle(path, url):
-
-            def content_expected(mime):
-                return any(
-                    map(
-                        mime.startswith,
-                        ("application/binary", "application/octet-stream"),
-                    )
-                )
-
-        elif is_image(path, url):
-
-            def content_expected(mime):
-                return mime in (
-                    "image/jpeg",
-                    "image/jpg",
-                    "image/png",
-                    "application/octet-stream",
-                    "application/binary",
-                    "video/mp4",
-                )
-
-        elif is_audiolibrary(path, url):
-
-            def content_expected(mime):
-                return mime in (
-                    "application/octet-stream",
-                    "application/binary",
-                ) or mime.startswith("audio/")
-
-        elif is_pdf(path, url):
-
-            def content_expected(mime):
-                return mime in (
-                    "application/pdf",
-                    "application/binary",
-                    "application/octet-stream",
-                )
-        
-        elif is_from_script(path, url) or is_custom_ui_asset(path, url):
-
-            def content_expected(mime):
-                return mime in (
-                    "text/plain",
-                    "application/pdf",
-                    "application/binary",
-                    "application/octet-stream",
-                    "application/json",
-                    "application/x-tgif",
-                    "image/jpeg",
-                    "image/jpg",
-                    "image/png",
-                    "video/mp4",
-                )
-
-        else:
-            errstr = "Do not know how to retrieve URL {url} at {path}.".format(
-                url=url, path=path
-            )
-            raise ValueError(errstr)
-
-        outfile_name = get_fs_path(path, url)
-        if outfile_name is not None:
-            # Check if the object is already cached.
-            if os.path.isfile(outfile_name) and not refetch:
+            # A mod might refer to the same URL multiple times.
+            if url in done:
                 continue
 
-        print("{} ".format(url), end="", flush=True)
+            # Only attempt to get a URL one time, even if there is an error
+            done.add(url)
 
-        if dry_run:
-            print("dry run")
-            continue
+            # Some mods contain malformed URLs missing a prefix. I’m not
+            # sure how TTS deals with these. Let’s assume http for now.
+            if not urllib.parse.urlparse(url).scheme:
+                fetch_url = "http://" + url
+            else:
+                fetch_url = url
 
-        headers = {"User-Agent": user_agent}
-
-        for _ in range(timeout_retries):
             try:
-                results = download_file(
-                    url,
-                    fetch_url,
-                    outfile_name,
-                    headers,
-                    timeout,
-                    content_expected,
-                    ignore_content_type
-                )
-            except socket.timeout as error:
-                print_err("Error ({reason}). Retrying...".format(reason=error))
+                if urllib.parse.urlparse(fetch_url).hostname.find('localhost') >= 0:
+                    continue
+            except:
+                # URL was so badly formatted that there is no hostname.
+                missing.append((url, f"Invalid hostname"))
                 continue
-            except http.client.IncompleteRead as error:
-                print_err("Error ({reason}). Retrying...".format(reason=error))
-                continue
-            break
-        else:
-            print_err("All timeout retries exhausted.")
-            sys.exit(1)
 
-        if results is not None:
-            missing.append(results)
+            # To prevent downloading unexpected content, we check the MIME
+            # type in the response.
+            if is_obj(path, url):
+
+                def content_expected(mime):
+                    return any(
+                        map(
+                            mime.startswith,
+                            (
+                                "text/plain",
+                                "application/binary",
+                                "application/octet-stream",
+                                "application/json",
+                                "application/x-tgif",
+                            ),
+                        )
+                    )
+
+            elif is_assetbundle(path, url):
+
+                def content_expected(mime):
+                    return any(
+                        map(
+                            mime.startswith,
+                            ("application/binary", "application/octet-stream"),
+                        )
+                    )
+
+            elif is_image(path, url):
+
+                def content_expected(mime):
+                    return mime in (
+                        "image/jpeg",
+                        "image/jpg",
+                        "image/png",
+                        "application/octet-stream",
+                        "application/binary",
+                        "video/mp4",
+                    )
+
+            elif is_audiolibrary(path, url):
+
+                def content_expected(mime):
+                    return mime in (
+                        "application/octet-stream",
+                        "application/binary",
+                    ) or mime.startswith("audio/")
+
+            elif is_pdf(path, url):
+
+                def content_expected(mime):
+                    return mime in (
+                        "application/pdf",
+                        "application/binary",
+                        "application/octet-stream",
+                    )
+            
+            elif is_from_script(path, url) or is_custom_ui_asset(path, url):
+
+                def content_expected(mime):
+                    return mime in (
+                        "text/plain",
+                        "application/pdf",
+                        "application/binary",
+                        "application/octet-stream",
+                        "application/json",
+                        "application/x-tgif",
+                        "image/jpeg",
+                        "image/jpg",
+                        "image/png",
+                        "video/mp4",
+                    )
+
+            else:
+                errstr = "Do not know how to retrieve URL {url} at {path}.".format(
+                    url=url, path=path
+                )
+                raise ValueError(errstr)
+
+            outfile_name = get_fs_path(path, url)
+            if outfile_name is not None:
+                # Check if the object is already cached.
+                if os.path.isfile(outfile_name) and not refetch:
+                    continue
+
+            ps.print("{} ".format(url), end="", flush=True)
+
+            if dry_run:
+                ps.print("dry run")
+                continue
+
+            headers = {"User-Agent": user_agent}
+
+            for _ in range(timeout_retries):
+                try:
+                    results = download_file(
+                        url,
+                        fetch_url,
+                        outfile_name,
+                        headers,
+                        timeout,
+                        content_expected,
+                        ignore_content_type,
+                        ps
+                    )
+                except socket.timeout as error:
+                    ps.print("Error ({reason}). Retrying...".format(reason=error))
+                    continue
+                except http.client.IncompleteRead as error:
+                    ps.print("Error ({reason}). Retrying...".format(reason=error))
+                    continue
+                break
+            else:
+                print_err("All timeout retries exhausted.")
+                sys.exit(1)
+
+            if results is not None:
+                missing.append(results)
     
     if len(missing) > 0:
         workshop_id = os.path.splitext(os.path.basename(filename))[0]
@@ -360,8 +376,8 @@ def prefetch_file(
         missing_filename = f"{workshop_id} [{safe_save_name}] missing.txt"
         missing_path = os.path.join(dest, missing_filename)
 
-        print_err(f"{len(missing)} URLs missing!")
-        print_err(f"Saving missing file list to {missing_path}.")
+        ps.print(f"{len(missing)} URLs missing!")
+        ps.print(f"Saving missing file list to {missing_path}.")
 
         with open(missing_path, 'w') as f:
             for url, error in missing:
@@ -371,7 +387,7 @@ def prefetch_file(
         completion_msg = "Dry-run for {} completed."
     else:
         completion_msg = "Prefetching {} completed."
-    print(completion_msg.format(filename))
+    ps.print(completion_msg.format(filename))
 
 
 def prefetch_files(args, semaphore=None):
@@ -384,6 +400,8 @@ def prefetch_files(args, semaphore=None):
             if not os.path.exists(infile_dir):
                 print_err(f"Cannot find directory {infile_dir}")
                 continue
+
+            print(f"Prefetching assets in {infile_dir}:")
             
             infile_names += get_mods_in_directory(infile_dir, os.path.join(infile_dir, 'prefetch_mtimes.pkl'))
     else:
@@ -405,6 +423,7 @@ def prefetch_files(args, semaphore=None):
                 timeout_retries=args.timeout_retries,
                 semaphore=semaphore,
                 user_agent=args.user_agent,
+                verbose=args.verbose,
             )
 
         except (FileNotFoundError, IllegalSavegameException, SystemExit):

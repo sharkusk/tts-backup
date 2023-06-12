@@ -10,7 +10,7 @@ from tkinter import Tk
 from tkinter import X
 from tkinter.font import Font
 from tts_tools import libtts
-from tts_tools.backup import backup_json
+from tts_tools.backup import backup_files
 from tts_tools.backup import cli
 from tts_tools.libgui.entry import DirEntry
 from tts_tools.libgui.entry import FileEntry
@@ -126,6 +126,8 @@ class GUI(Frame):
         args = self.parse_args()
         if not args:
             return
+        
+        args.verbose = True  # Disable progress bar
 
         self.output.clear()
 
@@ -134,7 +136,7 @@ class GUI(Frame):
             with ExitStack() as stack:
                 stack.enter_context(self.output)
                 stack.enter_context(suppress(SystemExit))
-                backup_json(args)
+                backup_files(args)
 
         thread = threading.Thread(target=callback)
         thread.start()

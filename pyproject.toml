@@ -16,6 +16,7 @@ requires-python = ">=3.8"
 dynamic = ["version"]
 license = {text = "GPL3"}
 dependencies = [
+    "alive-progress==3.1.4",
 ]
 
 [project.urls]
