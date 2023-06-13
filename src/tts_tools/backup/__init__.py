@@ -131,7 +131,8 @@ def backup_json(
             outfile.put_metadata(comment=comment)
     
     if dry_run:
-        print("Dry run for {file} completed.".format(file=infile_name))
+        if verbose:
+            print("Dry run for {file} completed.".format(file=infile_name))
     else:
         zipfile.close()
 

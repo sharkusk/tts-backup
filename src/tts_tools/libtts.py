@@ -112,7 +112,7 @@ def seekURL(dic, trail=[], done=None):
             yield (newtrail, v)
 
         elif k == "LuaScript":
-            NO_EXT_SITES = ['steamusercontent.com', 'pastebin.com', 'paste.ee', 'drive.google.com']
+            NO_EXT_SITES = ['steamusercontent.com', 'pastebin.com', 'paste.ee', 'drive.google.com', 'steamuserimages-a.akamaihd.net',]
             # Parse lauscript for potential URLs
             url_matches = re.findall(r'((?:http|https):\/\/(?:[\w\-_]+(?:(?:\.[\w\-_]+)+))(?:[\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?)', v)
             for url in url_matches:

@@ -33,6 +33,17 @@ from contextlib import nullcontext
 #logging.basicConfig(level=logging.INFO)
 #logger = logging.getLogger('alive_progress')
 
+DEFAULT_EXT = {
+    "text/plain":          ".obj",
+    "application/json":    ".obj",
+    "application/x-tgif":  ".obj",
+    "application/pdf":     ".pdf",
+    "image/jpeg":          ".jpg",
+    "image/jpg":           ".jpg",
+    "image/png":           ".png",
+    "video/mp4":           ".mp4",
+}
+
 def download_file(
     url,
     fetch_url,
@@ -101,10 +112,14 @@ def download_file(
     # Format of content disposition looks like this:
     # 'attachment; filename="03_Die nostrische Hochzeit (Instrumental).mp3"; filename*=UTF-8\'\'03_Die%20nostrische%20Hochzeit%20%28Instrumental%29.mp3'
     content_disposition = response.getheader("Content-Disposition", "").strip()
-    offset = content_disposition.find('filename="')
-    if offset > 0:
-        name = content_disposition[offset:].split('"')[1]
+    offset_std = content_disposition.find('filename="')
+    offset_utf = content_disposition.find('filename*=UTF-8')
+    if offset_std >= 0:
+        name = content_disposition[offset_std:].split('"')[1]
         _, filename_ext = os.path.splitext(name)
+    elif offset_utf >= 0:
+        name = content_disposition[offset_utf:].split('=UTF-8')[1]
+        _, filename_ext = os.path.splitext(name.split(';')[0])
     else:
         # Use the url to extract the extension, ignoring any trailing ? url parameters
         offset = url.rfind("?")
@@ -115,6 +130,12 @@ def download_file(
     
     # TTS saves some file extensions as upper case
     filename_ext = fix_ext_case(filename_ext)
+
+    if filename_ext == '':
+        if content_type in DEFAULT_EXT:
+            filename_ext = DEFAULT_EXT[content_type]
+        else:
+            filename_ext = default_ext
 
     if outfile_name is None:
         ext = filename_ext
@@ -135,7 +156,6 @@ def download_file(
             else:
                 ext = filename_ext
             if ext == '':
-                ext = default_ext
                 print_err("Warning: Cannot find extension for {name}.  Using default {ext}".format(name=outfile_name, ext=ext))
 
             outfile_name = outfile_name + ext
@@ -248,7 +268,7 @@ def prefetch_file(
                     continue
             except:
                 # URL was so badly formatted that there is no hostname.
-                missing.append((url, f"Invalid hostname"))
+                missing.append((url, f"Invalid hostname",''))
                 skipped = True
                 continue
 
@@ -376,6 +396,13 @@ def prefetch_file(
                 except http.client.IncompleteRead as error:
                     ps.print("Error ({reason}). Retrying...".format(reason=error))
                     continue
+                if results is not None:
+                    # See if we have some trailing URL options and retry if so
+                    offset = fetch_url.rfind("?")
+                    if offset > 0:
+                        ps.print("Error ({reason}). Retrying without URL params...".format(reason=results[1]))
+                        fetch_url = fetch_url[0:fetch_url.rfind("?")]
+                        continue
                 break
             else:
                 print_err("All timeout retries exhausted.")
@@ -383,21 +410,25 @@ def prefetch_file(
 
             if results is not None:
                 skipped = True
-                missing.append(results)
+                missing.append((results[0], results[1], outfile_name))
     
-    if len(missing) > 0:
-        workshop_id = os.path.splitext(os.path.basename(filename))[0]
-        dest = os.path.dirname(filename)
-        safe_save_name = make_safe_filename(save_name)
-        missing_filename = f"{workshop_id} [{safe_save_name}] missing.txt"
-        missing_path = os.path.join(dest, missing_filename)
+    workshop_id = os.path.splitext(os.path.basename(filename))[0]
+    dest = os.path.dirname(filename)
+    safe_save_name = make_safe_filename(save_name)
+    missing_filename = f"{workshop_id} [{safe_save_name}] missing.txt"
+    missing_path = os.path.join(dest, missing_filename)
 
+    if len(missing) > 0:
         print(f"...{len(missing)} URLs missing!")
         print(f"Saving missing file list to {missing_path}.")
 
         with open(missing_path, 'w') as f:
-            for url, error in missing:
-                f.write(f"{url}: {error}\n")
+            for url, error, outfile_name in missing:
+                f.write(f"{url} ({outfile_name}): {error}\n")
+    else:
+        if os.path.isfile(missing_path):
+            print(f'Missing files no longer detected. Deleting {missing_filename}.')
+            os.remove(missing_path)
 
     if dry_run:
         completion_msg = "Dry-run for {} completed."
