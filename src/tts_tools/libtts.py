@@ -50,7 +50,7 @@ except KeyError:
 # provide the path to the new location through a simple one-line test file
 if os.path.exists(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')):
     with open(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')) as f:
-        GAMEDATA_DEFAULT = f.readline()
+        GAMEDATA_DEFAULT = f.readline().strip()
 
 class IllegalSavegameException(ValueError):
     def __init__(self):
