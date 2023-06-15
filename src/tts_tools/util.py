@@ -186,11 +186,14 @@ def save_modification_time(infile_name, mtime_filename):
 
 class PrintStatus():
 
-    def __init__(self, bar=None):
+    def __init__(self, bar=None, verbose=True):
         self.buffered_text = ""
         self.bar = bar
+        self.verbose = verbose
 
     def print(self, *args, **kwargs):
+        if not self.verbose:
+            return
         if self.bar:
             if 'end' in kwargs.keys() and kwargs['end'] == "":
                 output = io.StringIO()

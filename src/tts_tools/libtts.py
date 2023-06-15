@@ -48,9 +48,17 @@ except KeyError:
 
 # If the mod location is somewhere other than the default location we can
 # provide the path to the new location through a simple one-line test file
-if os.path.exists(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')):
-    with open(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')) as f:
-        GAMEDATA_DEFAULT = f.readline().strip()
+mod_link_path = os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')
+if not os.path.exists(os.path.join(GAMEDATA_DEFAULT, 'Mods')
+                or os.path.exists(mod_link_path)):
+    print(f"Reading default gamedata directory information from: {mod_link_path}")
+    if os.path.exists(mod_link_path):
+        with open(os.path.join(GAMEDATA_DEFAULT, 'mod_location.txt')) as f:
+            GAMEDATA_DEFAULT = f.readline().strip()
+        print(f"Default gamedata directory = {GAMEDATA_DEFAULT}")
+    else:
+        print(f"Warning: default gamedata directory not detected, must specify at command line!")
+        
 
 class IllegalSavegameException(ValueError):
     def __init__(self):

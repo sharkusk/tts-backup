@@ -26,12 +26,9 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from tqdm.auto import trange, tqdm
 
-from alive_progress import alive_bar; import time, logging
 from contextlib import nullcontext
-
-#logging.basicConfig(level=logging.INFO)
-#logger = logging.getLogger('alive_progress')
 
 DEFAULT_EXT = {
     "text/plain":          ".obj",
@@ -52,8 +49,9 @@ def download_file(
     timeout,
     content_expected,
     ignore_content_type,
-    default_ext,
+    default_ext_from_path,
     ps,
+    retry_num,
     verbose
 ):
     missing = None
@@ -124,41 +122,36 @@ def download_file(
         # Use the url to extract the extension, ignoring any trailing ? url parameters
         offset = url.rfind("?")
         if offset > 0:
-            _, filename_ext = os.path.splitext(url[0:url.rfind("?")])
+            filename_ext = os.path.splitext(url[0:url.rfind("?")])[1]
         else:
-            _, filename_ext = os.path.splitext(url)
+            filename_ext = os.path.splitext(url)[1]
     
-    # TTS saves some file extensions as upper case
-    filename_ext = fix_ext_case(filename_ext)
-
     if filename_ext == '':
         if content_type in DEFAULT_EXT:
             filename_ext = DEFAULT_EXT[content_type]
         else:
-            filename_ext = default_ext
+            filename_ext = default_ext_from_path
+
+    # TTS saves some file extensions as upper case
+    filename_ext = fix_ext_case(filename_ext)
 
     if outfile_name is None:
         ext = filename_ext
         outfile_name = get_fs_path_from_extension(url, ext)
 
         if outfile_name is None:
-            ps.print("Unknown file type {type}.".format(type=ext))
-            return (url, f"Unknown file type ({ext})")
+            ps.print("Cannot detect filepath for filetype '{type}'.".format(type=ext))
+            return (url, f"Cannot detect filepath ({ext})")
     else:
         # Check if we know the extension of our filename.  If not, use
         # the data in the response to determine the appropriate extension.
-        _, ext = os.path.splitext(outfile_name)
+        ext = os.path.splitext(outfile_name)[1]
         if ext == '':
-            if content_type in ['image/png']:
-                ext = '.png'
-            elif content_type in ['image/jpg', 'image/jpeg']:
-                ext = '.jpg'
-            else:
-                ext = filename_ext
-            if ext == '':
-                print_err("Warning: Cannot find extension for {name}.  Using default {ext}".format(name=outfile_name, ext=ext))
-
+            ext = filename_ext
             outfile_name = outfile_name + ext
+
+    if ext == '':
+        print_err("Warning: Cannot find extension for {name}.")
     
     mod_dir = os.path.split(os.path.split(outfile_name)[0])[1]
     if verbose:
@@ -169,7 +162,17 @@ def download_file(
 
     try:
         with open(outfile_name, "wb") as outfile:
-            outfile.write(response.read())
+            num_segs = int(int(length)/(8*1024))
+            desc = f"{ext}->{mod_dir} {size_msg}"
+            if retry_num > 0:
+                desc = f"Retry {retry_num} - {desc}"
+            with tqdm(total=num_segs, leave=False, desc=desc) as pbar:
+                pbar.update(1)
+                data = response.read(1024*8)
+                while(data):
+                    outfile.write(data)
+                    data = response.read(1024*8)
+                    pbar.update(1)
 
     except FileNotFoundError as error:
         print_err("Error writing object to disk: {}".format(error))
@@ -218,8 +221,6 @@ def prefetch_file(
     except Exception:
         save_name = "???"
     
-    cur_dir = os.getcwd()
-
     # get_fs_path is relative, so need to change to the gamedir directory
     # so existing file extensions can be properly detected
     os.chdir(gamedata_dir)
@@ -243,8 +244,9 @@ def prefetch_file(
     skipped = False
     urls = list(urls) # Need for progress bar count
 
-    with alive_bar(len(urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
-        ps = PrintStatus(bar)
+    #with alive_bar(len(urls), dual_line=True, title=readable_filename, unit=' files') if not verbose else nullcontext() as bar:
+    with tqdm(total=len(urls), desc=save_name, miniters=1) as pbar:
+        ps = PrintStatus(None, verbose=verbose)
         for path, url in urls:
 
             if semaphore and semaphore.acquire(blocking=False):
@@ -252,7 +254,8 @@ def prefetch_file(
                 return
 
             if not verbose:
-                bar(skipped=skipped)
+                pbar.update(1)
+                #bar(skipped=skipped)
                 skipped = False
             
             # Some mods contain malformed URLs missing a prefix. I’m not
@@ -272,7 +275,6 @@ def prefetch_file(
                 skipped = True
                 continue
 
-            # To prevent downloading unexpected content, we check the MIME
             # type in the response.
             if is_obj(path, url):
 
@@ -388,6 +390,7 @@ def prefetch_file(
                         ignore_content_type,
                         default_ext,
                         ps,
+                        i,
                         verbose
                     )
                 except socket.timeout as error:
@@ -434,7 +437,8 @@ def prefetch_file(
         completion_msg = "Dry-run for {} completed."
     else:
         completion_msg = "Prefetching {} completed."
-    print(completion_msg.format(filename))
+    if verbose:
+        print(completion_msg.format(filename))
 
 
 def prefetch_files(args, semaphore=None):
@@ -457,7 +461,16 @@ def prefetch_files(args, semaphore=None):
     for infile_name in infile_names:
 
         if not os.path.exists(infile_name):
-            infile_name = os.path.join(os.path.join(args.gamedata_dir, 'Mods/Workshop'), infile_name)
+            new_infile_name = os.path.join(os.path.join(args.gamedata_dir, os.path.join('Mods', 'Workshop')), infile_name)
+
+            if not os.path.exists(new_infile_name):
+                if infile_name != new_infile_name:
+                    print_err(f"Unable to find '{infile_name}' or '{new_infile_name}'. Skipping.")
+                else:
+                    print_err(f"Unable to find '{infile_name}'. Skipping.")
+                continue
+
+            infile_name = new_infile_name
 
         try:
             prefetch_file(
